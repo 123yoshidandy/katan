@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1d5f8a">
+    <title>KATAN</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%9D%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main>
+        <!-- 開始画面（ローカル対戦） -->
+        <section id="screen-setup" class="screen title-screen">
+            <div class="title-art" aria-hidden="true">
+                <svg id="title-board" viewBox="-130 -120 260 240"></svg>
+            </div>
+            <div class="title-side">
+                <h1 class="title">KATAN</h1>
+                <p class="tagline">島を開拓して、<strong>10点</strong>を目指そう！</p>
+                <div class="panel">
+                    <!-- 人数は切り替えボタンで選ぶ（ブラウザのプルダウンは出る位置を決められないため） -->
+                    <div class="row">人数
+                        <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                            <button type="button" role="radio" data-count="2">2人</button>
+                            <button type="button" role="radio" data-count="3">3人</button>
+                            <button type="button" role="radio" data-count="4">4人</button>
+                        </div>
+                    </div>
+                    <div id="seat-list"></div>
+                    <div class="buttons">
+                        <button id="start-local" class="primary">ゲーム開始</button>
+                        <button id="open-online" class="online">オンラインで遊ぶ</button>
+                    </div>
+                    <div class="setup-footer">
+                        <button id="open-help" class="link">📖 遊び方を見る</button>
+                        <button class="small icon sound-toggle" aria-label="効果音">
+                            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
+                                <path class="sound-on" d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>
+                                <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- オンライン対戦の入口 -->
+        <section id="screen-online" class="screen hidden">
+            <div class="panel narrow">
+                <h2>オンライン対戦</h2>
+                <label class="row">名前 <input id="online-name" maxlength="12" autocomplete="nickname"></label>
+                <div class="buttons">
+                    <button id="create-room" class="primary">部屋を作る</button>
+                </div>
+                <label class="row">部屋番号 <input id="room-code" inputmode="numeric"></label>
+                <div class="buttons">
+                    <button id="join-room" class="primary">参加する</button>
+                    <button id="back-to-setup">戻る</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ロビー -->
+        <section id="screen-lobby" class="screen hidden">
+            <div class="panel narrow">
+                <h2>部屋 <span id="lobby-code"></span></h2>
+                <div class="buttons">
+                    <button id="share-invite">招待URLを共有</button>
+                </div>
+                <ul id="lobby-players"></ul>
+                <div id="host-controls" class="buttons">
+                    <button id="add-cpu">CPUを追加</button>
+                    <button id="start-online" class="primary">ゲーム開始</button>
+                </div>
+                <p id="guest-note" class="hint">部屋を作った人がゲームを始めるまでお待ちください</p>
+                <div class="buttons">
+                    <button id="leave-room">部屋を出る</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム画面：横画面では左に盤面・右に操作、縦画面では上に盤面・下に操作 -->
+        <section id="screen-game" class="screen hidden">
+            <div class="board-area">
+                <svg id="board" aria-label="盤面"></svg>
+                <div id="dice" class="dice"></div>
+                <!-- ホーム・遊び方・効果音・スタンプ（上部のバーは置かず、盤面の隅に並べる） -->
+                <div class="board-buttons">
+                    <button id="menu-button" class="small icon" aria-label="ホームに戻る">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>
+                    </button>
+                    <button id="help-button" class="small icon" aria-label="遊び方">？</button>
+                    <button class="small icon sound-toggle" aria-label="効果音">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
+                                <path class="sound-on" d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>
+                                <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                            </svg>
+                    </button>
+                    <button id="stamp-button" class="small icon hidden" aria-label="スタンプ">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H10l-4 3.5v-3.5H4z"/></svg>
+                    </button>
+                </div>
+                <div id="stamps" class="stamps hidden"></div>
+            </div>
+            <div class="side">
+                <div id="players" class="players"></div>
+                <div id="guide" class="guide" aria-live="polite"></div>
+                <div id="trade-status" class="trade-status hidden"></div>
+                <div id="hand" class="hand"></div>
+                <div id="actions" class="actions">
+                    <button id="act-road" data-piece="road">道</button>
+                    <button id="act-settlement" data-piece="settlement">開拓地</button>
+                    <button id="act-city" data-piece="city">都市</button>
+                    <button id="act-dev">発展カード</button>
+                    <button id="act-trade">交換</button>
+                    <!-- サイコロを振る前は「サイコロ」、振ったあとは「手番を終える」を同じ場所に出す -->
+                    <button id="act-roll" class="primary">サイコロ</button>
+                    <button id="act-end" class="end hidden">手番を終える</button>
+                </div>
+                <ol id="log" class="log"></ol>
+            </div>
+            <div id="result" class="result hidden"></div>
+        </section>
+    </main>
+
+    <!-- 手札を捨てる（7 が出て、8枚以上持っているとき） -->
+    <dialog id="discard-dialog" class="sheet" tabindex="-1">
+        <h2>手札を捨てる</h2>
+        <p id="discard-note"></p>
+        <div id="discard-picker" class="picker"></div>
+        <div class="buttons">
+            <button id="discard-confirm" class="primary">捨てる</button>
+        </div>
+    </dialog>
+
+    <!-- 交換（銀行・港 / プレイヤーとの交渉） -->
+    <dialog id="trade-dialog" class="sheet" tabindex="-1">
+        <div class="sheet-head">
+            <h2>交換</h2>
+            <button class="small icon close-dialog" aria-label="閉じる">✕</button>
+        </div>
+        <div class="segmented tabs" role="tablist">
+            <button type="button" role="tab" data-tab="bank">銀行・港</button>
+            <button type="button" role="tab" data-tab="players">プレイヤー</button>
+        </div>
+        <div id="trade-bank" class="tab-body">
+            <p class="hint">出す資源</p>
+            <div id="bank-give" class="choice-row"></div>
+            <p class="hint">もらう資源</p>
+            <div id="bank-get" class="choice-row"></div>
+            <div class="buttons">
+                <button id="bank-confirm" class="primary">交換する</button>
+            </div>
+        </div>
+        <div id="trade-players" class="tab-body">
+            <p class="hint">出す資源</p>
+            <div id="offer-give" class="picker"></div>
+            <p class="hint">欲しい資源</p>
+            <div id="offer-get" class="picker"></div>
+            <div class="buttons">
+                <button id="offer-confirm" class="primary">みんなに持ちかける</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 発展カード（買う・使う） -->
+    <dialog id="dev-dialog" class="sheet" tabindex="-1">
+        <div class="sheet-head">
+            <h2>発展カード</h2>
+            <button class="small icon close-dialog" aria-label="閉じる">✕</button>
+        </div>
+        <div class="buttons">
+            <button id="dev-buy" class="primary">買う</button>
+            <span id="dev-deck-count" class="hint"></span>
+        </div>
+        <div id="dev-list" class="dev-list"></div>
+        <div id="dev-choose" class="hidden">
+            <p id="dev-choose-note" class="hint"></p>
+            <div id="dev-choose-row" class="choice-row"></div>
+            <div class="buttons">
+                <button id="dev-choose-confirm" class="primary">使う</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 盗賊で奪う相手を選ぶ -->
+    <dialog id="victim-dialog" class="sheet" tabindex="-1">
+        <h2>誰から奪いますか？</h2>
+        <div id="victim-list" class="buttons column"></div>
+        <div class="buttons">
+            <button id="victim-cancel">タイルを選び直す</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="help" tabindex="-1">
+        <div class="sheet-head">
+            <h2>遊び方</h2>
+            <button class="small icon close-dialog" aria-label="閉じる">✕</button>
+        </div>
+        <div class="help-body">
+            <section>
+                <h3>🎯 目的</h3>
+                <p>島に開拓地や都市を建てて、<strong>自分の手番に10点</strong>に達した人の勝ちです。</p>
+                <p>開拓地1点・都市2点・勝利点カード1点、最長交易路と最大騎士力はそれぞれ2点です。</p>
+            </section>
+            <section>
+                <h3>🏝️ 島と資源</h3>
+                <p class="terrains"><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-wood"/></svg>森＝木材</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-brick"/></svg>丘陵＝レンガ</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-sheep"/></svg>牧草地＝羊毛</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-wheat"/></svg>畑＝小麦</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-ore"/></svg>山地＝鉄</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-desert"/></svg>砂漠からは何も出ません</span></p>
+                <p>サイコロの目と同じ数字のタイルに接する<strong>開拓地は1枚、都市は2枚</strong>の資源をもらえます。数字の下の点が多いほど出やすい目です（6と8は赤）。</p>
+            </section>
+            <section>
+                <h3>🏠 初期配置</h3>
+                <p>順番に開拓地と道を1つずつ置き、折り返して逆の順にもう1組置きます。2つ目の開拓地の周りの資源をもらって始まります。</p>
+            </section>
+            <section>
+                <h3>🔁 手番の流れ</h3>
+                <ol>
+                    <li><strong>サイコロを振る</strong>（全員が資源をもらう）</li>
+                    <li>好きな順で何度でも：<strong>交換</strong>・<strong>建設</strong>・<strong>発展カード</strong>（使うのは1手番に1枚）</li>
+                    <li><strong>手番を終える</strong></li>
+                </ol>
+            </section>
+            <section>
+                <h3>🔨 建設に必要な資源</h3>
+                <ul class="costs">
+                    <li><strong>道</strong>：木材・レンガ（自分の道か建物につなげる）</li>
+                    <li><strong>開拓地</strong>：木材・レンガ・羊毛・小麦（自分の道につながる場所。ほかの建物の隣には置けない）</li>
+                    <li><strong>都市</strong>：小麦2・鉄3（自分の開拓地を都市にする）</li>
+                    <li><strong>発展カード</strong>：羊毛・小麦・鉄</li>
+                </ul>
+            </section>
+            <section>
+                <h3>🦹 7 と盗賊</h3>
+                <p>7 が出たら、手札が8枚以上の人は半分（切り捨て）を捨てます。サイコロを振った人は盗賊を別のタイルに動かし、そのタイルに建物を持つ人から1枚奪います。盗賊のいるタイルからは資源が出ません。</p>
+            </section>
+            <section>
+                <h3>🃏 発展カード</h3>
+                <ul>
+                    <li><strong>騎士</strong>：盗賊を動かして1枚奪う。3枚以上使って一番多い人が<strong>最大騎士力</strong>（2点）</li>
+                    <li><strong>街道建設</strong>：道を2本無料で置く</li>
+                    <li><strong>収穫</strong>：好きな資源を2枚もらう</li>
+                    <li><strong>独占</strong>：資源を1種類選び、ほかの全員からその資源を全部もらう</li>
+                    <li><strong>勝利点</strong>：持っているだけで1点（ほかの人には見えません）</li>
+                </ul>
+                <p>買った手番には使えません。騎士などはサイコロを振る前にも使えます。</p>
+            </section>
+            <section>
+                <h3>🤝 交換</h3>
+                <p>銀行とは同じ資源4枚で好きな資源1枚と交換できます。港に建物があれば 3:1、資源の描かれた港なら その資源 2:1 で交換できます。</p>
+                <p>手番の人は、ほかの人に交換を持ちかけられます。受けてくれた人の中から相手を選ぶと成立します。</p>
+            </section>
+            <section>
+                <h3>🛣️ 最長交易路</h3>
+                <p>5本以上つながった道を最初に作った人が2点を得ます。もっと長い道を作った人に移ります。ほかの人の開拓地があると、道はそこで途切れます。</p>
+            </section>
+        </div>
+    </dialog>
+
+    <div id="toast" class="toast hidden" role="alert"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

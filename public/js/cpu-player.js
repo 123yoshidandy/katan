@@ -45,7 +45,7 @@ export function chooseCommand(game, seat) {
         return { type: 'discard', cards: chooseDiscard(game, seat, game.pending.remaining[seat]) };
     }
     if (game.trade && seat !== game.trade.from) {
-        return { type: 'respondTrade', accept: wantsTrade(game, seat) };
+        return { type: 'respondTrade', id: game.trade.id, accept: wantsTrade(game, seat) };
     }
     if (game.phase === 'setup') return chooseSetup(game, seat);
     if (game.pending?.type === 'robber') return chooseRobber(game, seat);

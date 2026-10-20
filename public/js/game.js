@@ -104,7 +104,8 @@ export default class Game {
         // 手番の途中で、ほかのことより先に片付ける処理
         // { type: 'discard', remaining: { 席: 枚数 } } / { type: 'robber' } / { type: 'roadBuilding', remaining }
         this.pending = null;
-        this.trade = null;             // 交渉 { from, give, get, responses: { 席: 'accept' | 'reject' } }
+        this.trade = null;             // 交渉 { id, from, give, get, responses: { 席: 'accept' | 'reject' } }
+        this.tradeSerial = 0;          // 交渉の通し番号（取り下げたあとに届いた、古い交渉への返事を断るため）
         this.longestRoad = null;       // 最長交易路の持ち主
         this.largestArmy = null;       // 最大騎士力の持ち主
         this.roadLengths = this.players.map(() => 0);
@@ -140,7 +141,8 @@ export default class Game {
         }
         if (type === 'discard') return this.record(playerId, { type, cards: command.cards }, () => this.discard(player, command.cards));
         if (type === 'respondTrade') {
-            return this.record(playerId, { type, accept: Boolean(command.accept) }, () => this.respondTrade(player, Boolean(command.accept)));
+            const recorded = { type, id: command.id, accept: Boolean(command.accept) };
+            return this.record(playerId, recorded, () => this.respondTrade(player, recorded.id, recorded.accept));
         }
 
         if (playerId !== this.currentPlayerIndex) return this.reject('あなたの番ではありません');
@@ -177,7 +179,7 @@ export default class Game {
             case 'offerTrade':
                 return this.record(player.id, { type, give: command.give, get: command.get }, () => this.offerTrade(player, command.give, command.get));
             case 'confirmTrade':
-                return this.record(player.id, { type, with: command.with }, () => this.confirmTrade(player, command.with));
+                return this.record(player.id, { type, id: command.id, with: command.with }, () => this.confirmTrade(player, command.id, command.with));
             case 'cancelTrade':
                 return this.record(player.id, { type }, () => this.cancelTrade());
             case 'endTurn':
@@ -532,13 +534,14 @@ export default class Game {
         if (!give || !get || countCards(give) === 0 || countCards(get) === 0) return this.reject('出す資源と欲しい資源を選んでください');
         if (RESOURCES.some(r => give[r] > 0 && get[r] > 0)) return this.reject('同じ資源を出して受け取ることはできません');
         if (!hasCards(player.hand, give)) return this.reject('持っていない資源は出せません');
-        this.trade = { from: player.id, give, get, responses: {} };
+        this.trade = { id: this.tradeSerial + 1, from: player.id, give, get, responses: {} };
+        this.tradeSerial++;
         this.log(`${player.name}が交渉を持ちかけました（${formatCards(give)} → ${formatCards(get)}）`);
         return true;
     }
 
-    respondTrade(player, accept) {
-        if (!this.trade) return this.reject('交渉はありません');
+    respondTrade(player, id, accept) {
+        if (!this.trade || this.trade.id !== id) return this.reject('その交渉は終わっています');
         if (player.id === this.trade.from) return this.reject('自分の交渉には答えられません');
         if (accept && !hasCards(player.hand, this.trade.get)) return this.reject('求められた資源を持っていません');
         this.trade.responses[player.id] = accept ? 'accept' : 'reject';
@@ -546,9 +549,9 @@ export default class Game {
         return true;
     }
 
-    confirmTrade(player, partnerId) {
+    confirmTrade(player, id, partnerId) {
         const trade = this.trade;
-        if (!trade) return this.reject('交渉はありません');
+        if (!trade || trade.id !== id) return this.reject('その交渉は終わっています');
         if (trade.responses[partnerId] !== 'accept') return this.reject('その人は交渉を受けていません');
         const partner = this.players[partnerId];
         if (!hasCards(player.hand, trade.give) || !hasCards(partner.hand, trade.get)) return this.reject('資源が足りなくなっています');

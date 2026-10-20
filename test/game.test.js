@@ -282,13 +282,29 @@ describe('交換', () => {
         game.players[c].hand = cards({ ore: 1 });
         expect(game.applyCommand(id, { type: 'offerTrade', give: { wood: 2 }, get: { ore: 1 } })).toBe(true);
         expect(game.actors()).toEqual(expect.arrayContaining([b, c, id]));
-        expect(game.applyCommand(id, { type: 'confirmTrade', with: b })).toBe(false);
-        expect(game.applyCommand(b, { type: 'respondTrade', accept: false })).toBe(true);
-        expect(game.applyCommand(c, { type: 'respondTrade', accept: true })).toBe(true);
-        expect(game.applyCommand(id, { type: 'confirmTrade', with: c })).toBe(true);
+        const tradeId = game.trade.id;
+        expect(game.applyCommand(id, { type: 'confirmTrade', id: tradeId, with: b })).toBe(false);
+        expect(game.applyCommand(b, { type: 'respondTrade', id: tradeId, accept: false })).toBe(true);
+        expect(game.applyCommand(c, { type: 'respondTrade', id: tradeId, accept: true })).toBe(true);
+        expect(game.applyCommand(id, { type: 'confirmTrade', id: tradeId, with: c })).toBe(true);
         expect(game.players[id].hand).toEqual(cards({ ore: 1 }));
         expect(game.players[c].hand).toEqual(cards({ wood: 2 }));
         expect(game.trade).toBeNull();
+    });
+
+    it('取り下げたあとに届いた、前の交渉への返事は断る', () => {
+        const game = afterSetup(2);
+        const id = rolled(game);
+        const other = (id + 1) % 2;
+        game.players[id].hand = cards({ wood: 2 });
+        game.players[other].hand = cards({ ore: 2 });
+        game.applyCommand(id, { type: 'offerTrade', give: { wood: 1 }, get: { ore: 1 } });
+        const oldId = game.trade.id;
+        game.applyCommand(id, { type: 'cancelTrade' });
+        game.applyCommand(id, { type: 'offerTrade', give: { wood: 2 }, get: { ore: 1 } });
+        expect(game.applyCommand(other, { type: 'respondTrade', id: oldId, accept: true })).toBe(false);
+        expect(game.lastError).toBe('その交渉は終わっています');
+        expect(game.trade.responses).toEqual({});
     });
 
     it('持っていない資源は出せず、ほかの操作をすると交渉は取り下げになる', () => {

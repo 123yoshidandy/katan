@@ -21,7 +21,7 @@ export function loadOnlineSession() {
 }
 
 export default class OnlineGameController {
-    // listeners: onUpdate() / onLobby(lobby) / onError(message) / onConnectionChange(connected)
+    // listeners: onUpdate() / onLobby(lobby) / onError(message) / onConnectionChange(connected) / onStamp({ seat, stamp })
     constructor(serverUrl, listeners = {}) {
         this.listeners = listeners;
         this.view = null;              // 表示中のビュー（hydrate 済み）
@@ -44,6 +44,7 @@ export default class OnlineGameController {
             listeners.onUpdate?.();
         });
         this.net.on('connection', (connected) => listeners.onConnectionChange?.(connected));
+        this.net.on('stamp', (message) => listeners.onStamp?.(message));
     }
 
     get session() { return this.net.session; }
@@ -61,6 +62,7 @@ export default class OnlineGameController {
     backToLobby() { this.net.backToLobby(); }
     isHost() { return this.net.isHost(); }
     inviteUrl() { return this.net.inviteUrl(); }
+    stamp(stamp) { this.net.stamp(stamp); }
 
     // 部屋を出る（サーバーに知らせるので、席が「切断中」のまま残らない。保存した参加情報も消す）
     leave() {

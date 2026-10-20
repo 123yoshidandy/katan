@@ -98,9 +98,10 @@ describe('オンライン対戦（ゲームの定義）', () => {
 
         await current.send('command', { command: { type: 'offerTrade', give: { [giveResource]: 1 }, get: { [getResource]: 1 } } });
         expect(other.last('state').view.trade.from).toBe(clients.indexOf(current));
-        await other.send('command', { command: { type: 'respondTrade', accept: true } });
+        const tradeId = other.last('state').view.trade.id;
+        await other.send('command', { command: { type: 'respondTrade', id: tradeId, accept: true } });
         expect(current.last('state').view.trade.responses[clients.indexOf(other)]).toBe('accept');
-        await current.send('command', { command: { type: 'confirmTrade', with: clients.indexOf(other) } });
+        await current.send('command', { command: { type: 'confirmTrade', id: tradeId, with: clients.indexOf(other) } });
         expect(other.last('state').view.trade).toBeNull();
         expect(other.last('state').view.players[clients.indexOf(other)].hand[giveResource]).toBe(theirs[giveResource] + 1);
     });
