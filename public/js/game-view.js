@@ -5,6 +5,7 @@
  */
 
 import { countCards, WIN_POINTS } from './game.js';
+import { suggest } from './cpu-player.js';
 
 const VIEW_LOGS = 60; // ビューに入れる最近のログの数
 
@@ -59,7 +60,9 @@ export function createGameView(game, viewerId) {
             settlementSpots: game.settlementSpots(viewerId),
             citySpots: game.citySpots(viewerId),
             playableDevCards: game.playableDevCards(viewerId),
-            tradeRatios: Object.fromEntries(Object.keys(game.bank).map(r => [r, game.tradeRatio(viewerId, r)]))
+            tradeRatios: Object.fromEntries(Object.keys(game.bank).map(r => [r, game.tradeRatio(viewerId, r)])),
+            // アシスト：おすすめの手と次の目標（操作する番でなければ null）
+            suggestion: suggest(game, viewerId)
         };
     }
     return view;

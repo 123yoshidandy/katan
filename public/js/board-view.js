@@ -87,7 +87,8 @@ export const BOARD_VIEWBOX = '-312 -282 624 564';
 
 // 盤面を描く
 // state: { board, robber, buildings, roads }
-// options: { spots: { vertices, edges, hexes }, onVertex, onEdge, onHex, recent: { vertex, edge } }
+// options: { spots: { vertices, edges, hexes }, onVertex, onEdge, onHex, recent: { vertex, edge },
+//            best: { vertex, edge, hex }（おすすめに★を付ける）, labels: { 頂点: 数字 }（候補の印に出す）, rolled: 出た目 }
 export function renderBoard(root, state, options = {}) {
     root.setAttribute('viewBox', BOARD_VIEWBOX);
     root.replaceChildren();
@@ -110,7 +111,7 @@ export function renderBoard(root, state, options = {}) {
         const group = svg('g', { class: `hex terrain-${terrain}` });
         group.append(svg('polygon', { class: 'hex-tile', points: hexPoints(x, y, HEX_SIZE - 1.5), fill: TERRAIN_COLORS[terrain] }));
         group.append(svg('use', { href: `#sym-${terrain}`, x: x - 17, y: y - 47, width: 34, height: 34 }));
-        if (number) group.append(numberToken(x, y + 8, number));
+        if (number) group.append(numberToken(x, y + 8, number, number === options.rolled));
         root.append(group);
     });
 
@@ -132,36 +133,60 @@ export function renderBoard(root, state, options = {}) {
 
     // 候補（タップで選ぶ）
     const spots = options.spots ?? {};
+    const best = options.best ?? {};
+    const stars = [];
     (spots.hexes ?? []).forEach(hexId => {
         const { x, y } = at(GEOMETRY.hexes[hexId]);
-        const target = svg('polygon', { class: 'spot spot-hex', points: hexPoints(x, y, HEX_SIZE - 5), 'data-hex': hexId });
+        const target = svg('polygon', { class: `spot spot-hex${best.hex === hexId ? ' best' : ''}`, points: hexPoints(x, y, HEX_SIZE - 5), 'data-hex': hexId });
         target.addEventListener('click', () => options.onHex?.(hexId));
         root.append(target);
+        if (best.hex === hexId) stars.push({ x: x + 31, y: y + 6 });
     });
     (spots.edges ?? []).forEach(edgeId => {
         const edge = GEOMETRY.edges[edgeId];
         const a = at(GEOMETRY.vertices[edge.a]);
         const b = at(GEOMETRY.vertices[edge.b]);
-        const group = svg('g', { class: 'spot spot-edge', 'data-edge': edgeId });
+        const group = svg('g', { class: `spot spot-edge${best.edge === edgeId ? ' best' : ''}`, 'data-edge': edgeId });
         group.append(svg('line', { class: 'spot-line', x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
         group.append(svg('circle', { class: 'spot-mark', cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, r: 8 }));
         group.append(svg('circle', { class: 'spot-hit', cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, r: 19 }));
         group.addEventListener('click', () => options.onEdge?.(edgeId));
         root.append(group);
+        if (best.edge === edgeId) stars.push({ x: (a.x + b.x) / 2 + 11, y: (a.y + b.y) / 2 - 11 });
     });
     (spots.vertices ?? []).forEach(vertexId => {
         const { x, y } = at(GEOMETRY.vertices[vertexId]);
-        const group = svg('g', { class: 'spot spot-vertex', 'data-vertex': vertexId });
+        const group = svg('g', { class: `spot spot-vertex${best.vertex === vertexId ? ' best' : ''}`, 'data-vertex': vertexId });
         group.append(svg('circle', { class: 'spot-mark', cx: x, cy: y, r: 11 }));
+        const label = options.labels?.[vertexId];
+        if (label !== undefined) {
+            const text = svg('text', { class: 'spot-label', x, y: y + 4, 'text-anchor': 'middle' });
+            text.textContent = String(label);
+            group.append(text);
+        }
         group.append(svg('circle', { class: 'spot-hit', cx: x, cy: y, r: 22 }));
         group.addEventListener('click', () => options.onVertex?.(vertexId));
         root.append(group);
+        if (best.vertex === vertexId) stars.push({ x: x + 13, y: y - 13 });
     });
+
+    // おすすめの★（タップは下の候補に通す）
+    stars.forEach(({ x, y }) => root.append(svg('polygon', { class: 'best-star', points: starPoints(x, y, 11) })));
 }
 
-function numberToken(x, y, number) {
+const starPoints = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => {
+    const radius = i % 2 === 0 ? r : r * 0.45;
+    const angle = Math.PI / 5 * i - Math.PI / 2;
+    return `${(cx + radius * Math.cos(angle)).toFixed(1)},${(cy + radius * Math.sin(angle)).toFixed(1)}`;
+}).join(' ');
+
+// 頂点の出やすさ：周りのタイルの点の数の合計
+export const vertexPips = (board, vertexId) => GEOMETRY.vertices[vertexId].hexes
+    .reduce((sum, hexId) => sum + pips(board.hexes[hexId].number), 0);
+
+function numberToken(x, y, number, rolled = false) {
     const red = number === 6 || number === 8;
-    const group = svg('g', { class: `token${red ? ' red' : ''}` });
+    const group = svg('g', { class: `token${red ? ' red' : ''}${rolled ? ' rolled' : ''}` });
     group.append(svg('circle', { cx: x, cy: y, r: 19 }));
     const text = svg('text', { x, y: y + 4, 'text-anchor': 'middle' });
     text.textContent = String(number);

@@ -53,6 +53,25 @@ export function chooseCommand(game, seat) {
     return chooseTurn(game, seat);
 }
 
+// 人間へのアシスト：seat の人が今操作するなら、CPU ならどうするか（command）と、次に建てたいもの（goal）
+// CPU の判断はみんなに見えている情報だけを使うので、ビューに入れても他人の手札はわからない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || !game.actors().includes(seat)) return null;
+    // 交渉を持ちかけている間は、返事を見て相手を選ぶ（おすすめはしない）
+    if (game.trade && seat === game.trade.from) return null;
+    const command = chooseCommand(game, seat);
+    let goal = null;
+    if (game.phase === 'play' && !game.pending && !game.trade && seat === game.currentPlayerIndex) {
+        const target = buildTarget(game, seat);
+        if (target) {
+            const hand = game.players[seat].hand;
+            const missing = Object.fromEntries(RESOURCES.map(r => [r, Math.max(0, (COSTS[target.piece][r] ?? 0) - hand[r])]));
+            goal = { piece: target.piece, at: target.at, missing };
+        }
+    }
+    return { command, goal };
+}
+
 // ===== 評価 =====
 
 // 頂点の価値（周りのタイルの点の数と、資源の種類・港）

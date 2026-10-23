@@ -10,12 +10,13 @@ import Game, {
     MIN_PLAYERS, MAX_PLAYERS, RESOURCES, RESOURCE_NAMES, COSTS, DEV_NAMES, PIECE_NAMES, hasCards, countCards
 } from './game.js';
 import { GEOMETRY } from './board.js';
-import { renderBoard, injectSymbols, resourceIcon, pieceIcon, PLAYER_COLORS } from './board-view.js';
+import { renderBoard, injectSymbols, resourceIcon, pieceIcon, vertexPips, PLAYER_COLORS } from './board-view.js';
 import { runCpuStep } from './cpu-player.js';
 import { unlockSound, playEffect, toggleSound, isSoundOn, onSoundChange } from './sound.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 
 const SETUP_KEY = 'katan.setup'; // 開始画面で選んだ人数・名前・CPU
+const ASSIST_KEY = 'katan.assist'; // アシスト（おすすめの手・出やすさなど）の ON/OFF
 const TOAST_MS = 2500;
 const AUTO_ROLL_DELAY_MS = 700;  // サイコロを振るしかないとき、自動で振るまでの間
 const STAMP_MS = 2500;
@@ -58,6 +59,22 @@ function saveSetup(setup) {
     }
 }
 
+function loadAssist() {
+    try {
+        return localStorage.getItem(ASSIST_KEY) !== 'off';
+    } catch {
+        return true;
+    }
+}
+
+function saveAssist(on) {
+    try {
+        localStorage.setItem(ASSIST_KEY, on ? 'on' : 'off');
+    } catch {
+        // 保存できなくても遊べる
+    }
+}
+
 // 資源の組を小さな図柄で並べる（{ wood: 1, ore: 2 } → 🌲 ⛰⛰）
 function cardsLine(cards) {
     const line = element('span', { className: 'cards-line' });
@@ -82,10 +99,12 @@ export default class UI {
         this.discardChoice = {};
         this.devChoice = null;  // 収穫・独占で選んでいる資源 { card, picks }
         this.robberHex = null;  // 奪う相手を選んでいる盗賊の行き先
+        this.assist = loadAssist();
         injectSymbols();
         this.bindEvents();
         this.renderTitleArt();
         this.renderSoundButtons();
+        this.renderAssistButtons();
         $('room-code').maxLength = NetplayClient.ROOM_CODE_LENGTH;
         $('room-code').placeholder = `${NetplayClient.ROOM_CODE_LENGTH}桁の数字`;
         $('open-online').classList.toggle('hidden', !hasServer());
@@ -171,6 +190,13 @@ export default class UI {
         document.querySelectorAll('.sound-toggle').forEach(button => button.addEventListener('click', () => toggleSound()));
         onSoundChange(() => this.renderSoundButtons());
         $('stamp-button').addEventListener('click', () => $('stamps').classList.toggle('hidden'));
+        document.querySelectorAll('.assist-toggle').forEach(button => button.addEventListener('click', () => {
+            this.assist = !this.assist;
+            saveAssist(this.assist);
+            this.renderAssistButtons();
+            this.toast(`アシスト ${this.assist ? 'ON' : 'OFF'}`);
+            this.renderGame();
+        }));
 
         // ダイアログ：✕ と外側のタップで閉じる（手札を捨てるダイアログは閉じられない）
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -199,7 +225,9 @@ export default class UI {
             this.openDialog('dev-dialog');
         });
         $('act-trade').addEventListener('click', () => {
-            this.bankChoice = { give: null, get: null };
+            const hint = this.hint(this.view());
+            this.bankChoice = hint?.type === 'bankTrade' ? { give: hint.give, get: hint.get } : { give: null, get: null };
+            if (hint?.type === 'bankTrade') this.tradeTab = 'bank';
             this.offer = { give: {}, get: {} };
             this.openDialog('trade-dialog');
         });
@@ -229,6 +257,13 @@ export default class UI {
             this.send({ type: 'discard', cards: this.discardChoice });
         });
 
+        $('discard-auto').addEventListener('click', () => {
+            const hint = this.hint(this.view());
+            if (hint?.type !== 'discard') return;
+            this.discardChoice = { ...hint.cards };
+            this.renderDiscardDialog(this.view());
+        });
+
         // 発展カード
         $('dev-buy').addEventListener('click', () => this.send({ type: 'buyDevCard' }));
         $('dev-choose-confirm').addEventListener('click', () => {
@@ -252,6 +287,13 @@ export default class UI {
         document.querySelectorAll('.sound-toggle').forEach(button => {
             button.classList.toggle('off', !isSoundOn());
             button.setAttribute('aria-pressed', String(isSoundOn()));
+        });
+    }
+
+    renderAssistButtons() {
+        document.querySelectorAll('.assist-toggle').forEach(button => {
+            button.classList.toggle('off', !this.assist);
+            button.setAttribute('aria-pressed', String(this.assist));
         });
     }
 
@@ -540,11 +582,32 @@ export default class UI {
         return {};
     }
 
+    // アシスト：おすすめの手（アシストが OFF なら null）
+    hint(view) {
+        return (this.assist && view?.options?.suggestion?.command) || null;
+    }
+
+    // アシスト：盤面で★を付ける場所
+    bestSpot(view) {
+        const hint = this.hint(view);
+        if (!hint || !view.isMyTurn) return {};
+        if (hint.type === 'moveRobber') return { hex: hint.hex };
+        if (hint.type !== 'build') return {};
+        // 手番中は、おすすめと同じものを建てようとしているときだけ
+        if (view.phase === 'play' && !view.pending && this.mode !== hint.piece) return {};
+        return hint.piece === 'road' ? { edge: hint.at } : { vertex: hint.at };
+    }
+
     renderBoardArea(view) {
         const recent = this.recentPiece(this.lastView, view);
+        const spots = this.boardSpots(view);
+        const sum = view.dice ? view.dice[0] + view.dice[1] : null;
         renderBoard($('board'), view, {
-            spots: this.boardSpots(view),
+            spots,
             recent,
+            best: this.bestSpot(view),
+            labels: this.assist ? Object.fromEntries((spots.vertices ?? []).map(v => [v, vertexPips(view.board, v)])) : null,
+            rolled: this.assist && sum !== 7 ? sum : null,
             onVertex: (vertex) => this.onVertex(view, vertex),
             onEdge: (edge) => {
                 this.mode = null;
@@ -580,9 +643,11 @@ export default class UI {
         }
         this.robberHex = hex;
         const list = $('victim-list');
+        const hint = this.hint(view);
         list.replaceChildren(...victims.map(id => {
             const player = view.players[id];
-            const button = element('button', { onClick: () => {
+            const recommended = hint?.type === 'moveRobber' && hint.hex === hex && hint.victim === id;
+            const button = element('button', { className: recommended ? 'recommended' : '', onClick: () => {
                 $('victim-dialog').close();
                 this.robberHex = null;
                 this.send({ type: 'moveRobber', hex, victim: id });
@@ -656,8 +721,44 @@ export default class UI {
         return me ? (view.logs.at(-1) ?? '') : '';
     }
 
+    // アシスト：おすすめの手の説明 { text, cards }（cards は足りない資源の図柄）
+    assistText(view) {
+        const hint = this.hint(view);
+        if (!hint || view.discardCount > 0) return null;
+        const goal = view.options.suggestion.goal;
+        if (view.tradeWaiting) return { text: `${view.players[view.trade.from].name}の申し出は${hint.accept ? '受ける' : '断る'}のがおすすめ` };
+        if (view.phase === 'setup') {
+            return { text: view.setup.step === 'settlement' ? '★がおすすめ。数字は資源の出やすさ' : '道の向きを選ぶ（★がおすすめ）' };
+        }
+        if (view.pending?.type === 'robber') return { text: '盗賊を動かす（★がおすすめ）' };
+        if (view.pending?.type === 'roadBuilding') return { text: `道を置く（あと${view.pending.remaining}本・★がおすすめ）` };
+        if (this.mode) {
+            const best = this.bestSpot(view);
+            return { text: `${PIECE_NAMES[this.mode]}を建てる場所を選ぶ${best.vertex !== undefined || best.edge !== undefined ? '（★がおすすめ）' : ''}` };
+        }
+        switch (hint.type) {
+            case 'roll': return null;
+            case 'build': return { text: { settlement: '★ 開拓地を建てる（+1点）', city: '★ 開拓地を都市にする（+1点）', road: '★ 道を伸ばす' }[hint.piece] };
+            case 'bankTrade': return { text: `★ ${RESOURCE_NAMES[hint.give]}${view.options.tradeRatios[hint.give]}枚を${RESOURCE_NAMES[hint.get]}に交換` };
+            case 'buyDevCard': return { text: '★ 発展カードを買う' };
+            case 'playDev': return { text: hint.card === 'knight' ? '★ 騎士で盗賊を動かす' : `★ ${DEV_NAMES[hint.card]}を使う` };
+            case 'endTurn':
+                if (!goal) return { text: '★ 手番を終える' };
+                return { text: `★ 手番を終える。次は${PIECE_NAMES[goal.piece]}（あと`, cards: goal.missing, after: '）' };
+            default: return null;
+        }
+    }
+
     renderGuide(view) {
-        $('guide').textContent = this.guideText(view);
+        const guide = $('guide');
+        const assist = this.assistText(view);
+        if (!assist) {
+            guide.textContent = this.guideText(view);
+            return;
+        }
+        // 文中の★は金色にする
+        guide.replaceChildren(...assist.text.split(/(★)/).filter(Boolean).map(part => (part === '★' ? element('span', { className: 'star', text: '★' }) : part)));
+        if (assist.cards) guide.append(cardsLine(assist.cards), assist.after);
     }
 
     renderTradeStatus(view) {
@@ -687,8 +788,10 @@ export default class UI {
             const replies = element('div', { className: 'replies' });
             if (view.tradeWaiting) {
                 const canAccept = hasCards(view.me.hand, trade.get);
-                replies.append(element('button', { className: 'small primary', text: '受ける', disabled: !canAccept, onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: true }) }));
-                replies.append(element('button', { className: 'small', text: '断る', onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: false }) }));
+                const hint = this.hint(view);
+                const mark = (accept) => (hint?.type === 'respondTrade' && hint.accept === accept ? ' recommended' : '');
+                replies.append(element('button', { className: `small primary${mark(true)}`, text: '受ける', disabled: !canAccept, onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: true }) }));
+                replies.append(element('button', { className: `small${mark(false)}`, text: '断る', onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: false }) }));
             } else {
                 replies.append(element('span', { className: 'reply', text: trade.responses[view.me.id] === 'accept' ? '受けました' : '断りました' }));
             }
@@ -721,10 +824,18 @@ export default class UI {
             const button = $(`act-${piece}`);
             button.disabled = !this.canBuild(view, piece);
             button.classList.toggle('selected', this.mode === piece);
-            if (!button.querySelector('.cost')) {
-                button.replaceChildren(element('span', { className: 'label' }, [pieceIcon(piece, me.id), PIECE_NAMES[piece]]), cardsLine(COSTS[piece]));
-                button.lastChild.classList.add('cost');
+            // アシストが ON なら、足りない資源の図柄を薄くする
+            const cost = cardsLine(COSTS[piece]);
+            cost.classList.add('cost');
+            if (this.assist) {
+                let index = 0;
+                RESOURCES.forEach(r => {
+                    for (let i = 0; i < (COSTS[piece][r] ?? 0); i++, index++) {
+                        if (i >= me.hand[r]) cost.children[index].classList.add('lack');
+                    }
+                });
             }
+            button.replaceChildren(element('span', { className: 'label' }, [pieceIcon(piece, me.id), PIECE_NAMES[piece]]), cost);
         });
         const devButton = $('act-dev');
         devButton.disabled = view.phase !== 'play';
@@ -732,6 +843,15 @@ export default class UI {
         devButton.classList.toggle('ready', view.options?.playableDevCards.length > 0);
         $('act-trade').disabled = !(canAct && view.rolled);
         $('act-end').disabled = !(canAct && view.rolled);
+
+        // アシスト：おすすめの操作のボタンに★
+        const hint = this.mode ? null : this.hint(view);
+        const hinted = hint && view.phase === 'play' && view.isMyTurn && !view.pending ? {
+            build: `act-${hint.piece}`, bankTrade: 'act-trade', buyDevCard: 'act-dev', playDev: 'act-dev', endTurn: 'act-end'
+        }[hint.type] : null;
+        ['act-road', 'act-settlement', 'act-city', 'act-dev', 'act-trade', 'act-end'].forEach(id => {
+            $(id).classList.toggle('recommended', id === hinted && !$(id).disabled);
+        });
     }
 
     renderLog(view) {
@@ -803,6 +923,7 @@ export default class UI {
             onChange: () => this.renderDiscardDialog(view)
         });
         $('discard-confirm').disabled = chosen !== required;
+        $('discard-auto').classList.toggle('hidden', this.hint(view)?.type !== 'discard');
     }
 
     renderTradeDialog(view) {
@@ -862,6 +983,8 @@ export default class UI {
         if (!buy.querySelector('.cards-line')) {
             buy.replaceChildren('買う', cardsLine(COSTS.devCard));
         }
+        const hint = this.hint(view);
+        buy.classList.toggle('recommended', hint?.type === 'buyDevCard' && !buy.disabled);
         $('dev-deck-count').textContent = `山札 ${view.devDeckCount}枚`;
 
         const list = $('dev-list');
@@ -881,8 +1004,9 @@ export default class UI {
             info.append(title, element('span', { className: 'hint', text: DEV_TEXTS[type] + (fresh[type] && type !== 'victoryPoint' ? `（${fresh[type]}枚は次の手番から）` : '') }));
             row.append(info);
             if (type !== 'victoryPoint') {
+                const recommended = hint?.type === 'playDev' && hint.card === type;
                 row.append(element('button', {
-                    className: 'small primary', text: '使う', disabled: !playable.includes(type),
+                    className: `small primary${recommended ? ' recommended' : ''}`, text: '使う', disabled: !playable.includes(type),
                     onClick: () => this.playDev(type)
                 }));
             }
@@ -907,7 +1031,13 @@ export default class UI {
 
     playDev(type) {
         if (type === 'yearOfPlenty' || type === 'monopoly') {
-            this.devChoice = { card: type, picks: {} };
+            // アシストが ON なら、おすすめの資源を選んでおく
+            const hint = this.hint(this.view());
+            const picks = {};
+            if (hint?.type === 'playDev' && hint.card === type) {
+                (hint.resources ?? [hint.resource]).forEach(r => { picks[r] = (picks[r] ?? 0) + 1; });
+            }
+            this.devChoice = { card: type, picks };
             this.renderDevDialog(this.view());
             return;
         }

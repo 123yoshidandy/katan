@@ -132,6 +132,9 @@ button.link {
 .sound-toggle.off .sound-on { display: none; }
 .sound-toggle.off .sound-off { display: inline; }
 .sound-toggle.off { color: var(--muted); }
+.assist-toggle .assist-off { display: none; }
+.assist-toggle.off .assist-off { display: inline; }
+.assist-toggle.off { color: var(--muted); }
 
 .buttons {
     display: flex;
@@ -593,6 +596,37 @@ input {
     animation: blink 1.3s ease-in-out infinite;
 }
 
+/* アシスト：場所の出やすさ・おすすめの★・出た目のタイル */
+.spot-label {
+    font-size: 12px;
+    font-weight: 800;
+    fill: var(--ink);
+    pointer-events: none;
+}
+
+.spot.best .spot-mark {
+    fill: var(--gold);
+}
+
+.spot-hex.best {
+    fill: rgba(245, 197, 66, 0.3);
+}
+
+.best-star {
+    fill: var(--gold);
+    stroke: #4a3300;
+    stroke-width: 2.2;
+    filter: drop-shadow(0 0 2px #fff);
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
+.token.rolled circle:first-child {
+    stroke: var(--gold);
+    stroke-width: 4;
+    filter: drop-shadow(0 0 5px #fff6c0);
+}
+
 @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.45; }
@@ -740,6 +774,14 @@ input {
     text-overflow: ellipsis;
 }
 
+.guide .star {
+    color: var(--gold);
+}
+
+.guide .cards-line {
+    vertical-align: -2px;
+}
+
 .trade-status {
     flex: none;
     background: var(--panel);
@@ -864,6 +906,29 @@ button.res-card {
 .actions button .cost .mini-icon {
     width: 11px;
     height: 11px;
+}
+
+/* アシスト：足りない資源 */
+.actions button .cost .mini-icon.lack {
+    opacity: 0.3;
+}
+
+/* アシスト：おすすめのボタン（左上に★） */
+button.recommended {
+    position: relative;
+    outline: 3px solid var(--gold);
+    outline-offset: 1px;
+}
+
+button.recommended::before {
+    content: "★";
+    position: absolute;
+    top: -9px;
+    left: -6px;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0 0 2px #6b4a00, 0 0 2px #6b4a00;
 }
 
 .actions button.selected {

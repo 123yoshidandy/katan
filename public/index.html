@@ -37,6 +37,12 @@
                     </div>
                     <div class="setup-footer">
                         <button id="open-help" class="link">📖 遊び方を見る</button>
+                        <button class="small icon assist-toggle" aria-label="アシスト" title="アシスト">
+                            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/>
+                                <path class="assist-off" d="M4 4l16 16"/>
+                            </svg>
+                        </button>
                         <button class="small icon sound-toggle" aria-label="効果音">
                             <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
@@ -102,6 +108,12 @@
                                 <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
                             </svg>
                     </button>
+                    <button class="small icon assist-toggle" aria-label="アシスト" title="アシスト">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/>
+                            <path class="assist-off" d="M4 4l16 16"/>
+                        </svg>
+                    </button>
                     <button id="stamp-button" class="small icon hidden" aria-label="スタンプ">
                         <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H10l-4 3.5v-3.5H4z"/></svg>
                     </button>
@@ -135,6 +147,7 @@
         <p id="discard-note"></p>
         <div id="discard-picker" class="picker"></div>
         <div class="buttons">
+            <button id="discard-auto" class="hidden">おまかせ</button>
             <button id="discard-confirm" class="primary">捨てる</button>
         </div>
     </dialog>
@@ -255,6 +268,17 @@
                 <h3>🤝 交換</h3>
                 <p>銀行とは同じ資源4枚で好きな資源1枚と交換できます。港に建物があれば 3:1、資源の描かれた港なら その資源 2:1 で交換できます。</p>
                 <p>手番の人は、ほかの人に交換を持ちかけられます。受けてくれた人の中から相手を選ぶと成立します。</p>
+            </section>
+            <section>
+                <h3>💡 アシスト</h3>
+                <p>電球のボタンで ON/OFF を切り替えられます。ON のときは、次のように手助けします。</p>
+                <ul>
+                    <li><strong>★</strong>：おすすめの手（CPU ならこうする、という手）。ボタンや盤面の場所に付きます</li>
+                    <li><strong>場所の数字</strong>：開拓地を置ける場所の、周りのタイルの点の合計。大きいほど資源がよく出ます</li>
+                    <li><strong>光る数字</strong>：サイコロで出た目のタイル。ここに接する建物が資源をもらいます</li>
+                    <li><strong>薄い図柄</strong>：建設ボタンの資源のうち、足りないもの</li>
+                </ul>
+                <p>はじめは、★の場所に置き、★のボタンを押していけば遊べます。慣れてきたら、自分の作戦で選んでみてください。</p>
             </section>
             <section>
                 <h3>🛣️ 最長交易路</h3>
