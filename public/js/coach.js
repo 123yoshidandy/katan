@@ -1,153 +1,126 @@
 /**
- * 作戦の表示：ゲームの流れがわかるように、「目標 → そのために必要なもの → だから今すること」を3行で説明する
- * 例） 目標：都市で+1点・資源2倍／必要：小麦2・鉄3（鉄があと3枚）／だから：手番を終え、⑤が出るのを待つ
- * 横画面（667x375）の右の列で切れないよう、文は全角15字くらいまでにする
- * 「だから」の行は、★のおすすめの手（view.options.suggestion）と同じことを、理由と一緒に言う
+ * 作戦の表示：ゲームの流れがわかるように、今の状況を短い文章で説明する
+ * 「なぜそれを目指すか → 何が足りないか → だから今どうするか」がつながるように、場面ごとに文を組み立てる
+ * 例） 都市にすると1点増え、資源も2倍です。[小麦小麦鉄鉄鉄]のうち、鉄があと3枚足りません。⑤⑨で出るので、手番を終えて待ちます★
+ * 横の小さい画面（667x375）でも4行に収まるよう、前の文で言ったこと（足りない資源の名前など）はくり返さない
+ * 最後の文（今すること）は太字にし、★のおすすめの手（view.options.suggestion）と同じ手を言う
  * ビューだけから決める（オンライン対戦でも、ブラウザの中で計算する）
  *
- * coachStory（ビュー → 3行の中身のデータ）は DOM を使わない。renderCoach がそれを描く
+ * coachStory（ビュー → 文の列のデータ）は DOM を使わない。renderCoach がそれを描く
  */
 
-import { RESOURCES, RESOURCE_NAMES, COSTS, PIECE_NAMES, DEV_NAMES, countCards } from './game.js';
+import { RESOURCES, RESOURCE_NAMES, COSTS, PIECE_NAMES, countCards } from './game.js';
 import { GEOMETRY, pips } from './board.js';
 import { resourceIcon } from './board-view.js';
 
-// 目標ごとの説明（1行目）
-const GOALS = {
-    city: '都市で+1点・資源2倍',
-    settlement: '開拓地で+1点・資源が増える',
-    road: '道で開拓地の場所を作る',
-    devCard: '発展カードで騎士・勝利点'
+// 目指すものと、その理由（最初の文）
+const WHY = {
+    city: '都市にすると1点増え、資源も2倍です。',
+    settlement: '開拓地を建てると1点増え、資源も増えます。',
+    road: '開拓地を置ける場所がないので、道を伸ばします。',
+    devCard: '建てる物がないので、発展カードを集めます。'
 };
 
-// だからの行で、発展カードを使う理由
-const DEV_REASONS = {
-    knight: '騎士で盗賊を動かす',
-    roadBuilding: '街道建設で道を2本置く',
-    yearOfPlenty: '収穫で足りない資源をもらう',
-    monopoly: '独占で全員から集める'
-};
-
-// 3行の中身。隠すときは null
-// { goal: 部品の列, points: あと何点（なければ null）, need: 部品の列, action: 部品の列 }
+// 文の列。隠すときは null
+// [{ parts: 部品の列, strong }]（strong の文は太字。今すること）
 // 部品：文字列 / { icon: 資源, dim } / { chip: { number, blocked } } / { star: true }
 // mode: 建てる場所を選んでいるもの（road / settlement / city。画面の状態）
 export function coachStory(view, mode = null) {
     const me = view?.me;
     if (!me || view.phase === 'end' || !view.options) return null;
     const hint = view.options.suggestion?.command ?? null;
-    const star = (parts) => (hint ? [...parts, { star: true }] : parts);
-    const remaining = Math.max(0, view.winPoints - me.points);
+    const say = (...parts) => ({ parts });
+    const act = (...parts) => ({ parts: hint ? [...parts, { star: true }] : parts, strong: true });
 
     // 初期配置：資源の出る場所を取る
     if (view.phase === 'setup') {
         const step = view.isMyTurn ? view.setup.step : null;
-        return {
-            goal: ['資源の出る場所に開拓地を置く'],
-            points: null,
-            need: ['資源は、出た目のタイルに接すると出る'],
-            action: step === 'settlement' ? star(['点の多い数字の近くに置く'])
-                : step === 'road' ? star(['次の開拓地の方へ道を置く'])
-                    : ['点の多い数字・違う資源の場所を探す']
-        };
+        if (step === 'road') return [say('開拓地は、道の先にしか建てられません。'), act('次に開拓地を置きたい方へ、道を伸ばします')];
+        return [
+            say('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。'),
+            step === 'settlement' ? act('点の多い数字の近くに置くと、よく集まります') : say('点の多い数字の近くが狙い目です。')
+        ];
     }
 
     // 7 が出た：手札を捨てる
     if (view.discardCount > 0) {
-        return {
-            goal: ['7が出た。手札を半分捨てる'],
-            points: remaining,
-            need: ['8枚以上持っていると、半分捨てる'],
-            action: [`目標に使わない資源から${view.discardCount}枚捨てる`]
-        };
+        return [say('7が出たとき、手札が8枚以上あると半分を捨てます。'), { parts: [`次に建てたい物に使わない資源から、${view.discardCount}枚捨てます`], strong: true }];
     }
 
     // 交換の申し出への返事
     if (view.tradeWaiting && hint?.type === 'respondTrade') {
         const trade = view.trade;
-        return {
-            goal: [`${view.players[trade.from].name}からの交換の申し出`],
-            points: remaining,
-            need: [...cardParts(trade.give), 'をもらい', ...cardParts(trade.get), 'を渡す'],
-            action: star([hint.accept ? '目標に要る資源なので受ける' : '得にならないので断る'])
-        };
+        return [
+            say(`${view.players[trade.from].name}が、`, ...cardParts(trade.give), 'を渡すので', ...cardParts(trade.get), 'がほしいそうです。'),
+            hint.accept ? act('欲しい資源が手に入るので、受けます') : act('得にならないので、断ります')
+        ];
     }
 
     // 盗賊を動かす（7 か騎士）
     if (view.isMyTurn && view.pending?.type === 'robber') {
-        return {
-            goal: ['盗賊で相手の資源を止める'],
-            points: remaining,
-            need: ['盗賊のタイルは資源が出なくなる'],
-            action: star(['点の多い相手のタイルを止める'])
-        };
+        return [say('盗賊を置いたタイルは資源が出なくなり、そこに建物を持つ人から1枚奪えます。'), act('点の多い相手のタイルを狙います')];
     }
 
     // 街道建設
     if (view.isMyTurn && view.pending?.type === 'roadBuilding') {
-        return {
-            goal: [`道を無料で置ける（あと${view.pending.remaining}本）`],
-            points: remaining,
-            need: ['開拓地は自分の道の先にだけ建つ'],
-            action: star(['開拓地を置ける場所の方へ伸ばす'])
-        };
+        return [say(`街道建設で、道をあと${view.pending.remaining}本無料で置けます。`), act('開拓地を置けそうな場所へ伸ばします')];
     }
 
-    // ふだん：次に建てたいもの（なければ発展カード）を目標にする
-    const goal = view.options.goal;
-    const piece = goal?.piece ?? 'devCard';
+    // ふだん：次に建てたいもの（なければ発展カード）を目指す
+    const piece = view.options.goal?.piece ?? 'devCard';
     const cost = COSTS[piece];
-    const sources = resourceSources(view, me.id);
     const missing = Object.fromEntries(RESOURCES.map(r => [r, Math.max(0, (cost[r] ?? 0) - me.hand[r])]));
     const lacking = RESOURCES.filter(r => missing[r] > 0);
-    const lackCount = countCards(missing);
+    const names = lacking.map(r => RESOURCE_NAMES[r]).join('と');
 
-    // 必要：材料（足りないものは薄く）と、足りない枚数
-    const need = [];
+    // 材料（足りないものは薄く）と、足りない枚数
+    const icons = [];
     RESOURCES.forEach(r => {
-        for (let i = 0; i < (cost[r] ?? 0); i++) need.push({ icon: r, dim: i >= me.hand[r] });
+        for (let i = 0; i < (cost[r] ?? 0); i++) icons.push({ icon: r, dim: i >= me.hand[r] });
     });
-    need.push(lackCount === 0 ? '揃っている' : `${lacking.map(r => RESOURCE_NAMES[r]).join('・')}があと${lackCount}枚`);
+    const need = lacking.length === 0 ? say('材料は揃っています。') : say(...icons, `のうち、${names}があと${countCards(missing)}枚足りません。`);
 
-    return { goal: [GOALS[piece]], points: remaining, need, action: turnAction(view, hint, { piece, lacking, sources, star, mode }) };
+    // 足りない資源が出る自分の数字（盗賊のいるタイルは除く）
+    const sources = resourceSources(view, me.id);
+    const chips = uniqueChips(lacking.flatMap(r => sources[r]).filter(x => !x.blocked)).map(chip => ({ chip }));
+
+    return [say(WHY[piece]), need, nextStep(view, hint, { lacking, chips, act, mode })].filter(Boolean);
 }
 
-// だから：今すること
-function turnAction(view, hint, { piece, lacking, sources, star, mode }) {
-    const waitFor = () => {
-        const chips = lacking.flatMap(r => sources[r]).filter(s => !s.blocked);
-        if (lacking.length === 0) return null;
-        if (chips.length === 0) return null;
-        return uniqueChips(chips).map(chip => ({ chip }));
-    };
-
+// 今すること（最後の文）
+function nextStep(view, hint, { lacking, chips, act, mode }) {
     // 相手の番：待っている間に何が起きればよいか
     if (!view.isMyTurn) {
-        if (lacking.length === 0) return ['揃った。次の番で建てる'];
-        const chips = waitFor();
-        return chips ? [...chips, 'が出れば手に入る'] : ['自分の番に交換で手に入れる'];
+        if (lacking.length === 0) return { parts: ['次の自分の番で建てられます'], strong: true };
+        if (chips.length) return { parts: [...chips, 'が出れば手に入ります'], strong: true };
+        return { parts: ['出るタイルがないので、自分の番に交換します'], strong: true };
     }
-    if (view.trade) return ['相手の返事を待つ'];
+    if (view.trade) return { parts: ['持ちかけた交換の返事を待っています'], strong: true };
     if (mode) {
-        const text = `光っている場所に${PIECE_NAMES[mode]}を建てる`;
-        return hint?.type === 'build' && hint.piece === mode ? star([text]) : [text];
+        const text = `光っている場所から、${PIECE_NAMES[mode]}を建てる場所を選びます`;
+        return hint?.type === 'build' && hint.piece === mode ? act(text) : { parts: [text], strong: true };
     }
-    if (!hint) return [];
+    if (!hint) return null;
     switch (hint.type) {
-        case 'roll': return ['まずサイコロを振り、資源をもらう'];
-        case 'build':
-            return star([hint.piece === piece ? `材料が揃ったので${PIECE_NAMES[hint.piece]}を建てる` : `${PIECE_NAMES[hint.piece]}を建てる`]);
+        case 'roll': return { parts: ['まずサイコロを振って、資源を集めます'], strong: true };
+        case 'build': return act(`なので、${PIECE_NAMES[hint.piece]}を建てます`);
         case 'bankTrade': {
             const ratio = view.options.tradeRatios[hint.give];
-            return star(['余った', { icon: hint.give }, `${ratio}枚を`, { icon: hint.get }, 'に交換']);
+            return act('余っている', { icon: hint.give }, `${ratio}枚を、銀行で`, { icon: hint.get }, 'に換えれば揃います');
         }
-        case 'buyDevCard': return star(['余った資源で発展カードを買う']);
-        case 'playDev': return star([DEV_REASONS[hint.card] ?? `${DEV_NAMES[hint.card]}を使う`]);
-        case 'endTurn': {
-            const chips = waitFor();
-            return star(chips ? ['手番を終え、', ...chips, 'を待つ'] : ['手番を終える。次は交換を狙う']);
-        }
-        default: return [];
+        case 'buyDevCard': return act('余った資源で、発展カードを買っておきます');
+        case 'playDev':
+            return act({
+                knight: '騎士を使い、自分のタイルの盗賊を追い払います',
+                roadBuilding: '街道建設で、道を2本無料で置けます',
+                yearOfPlenty: '収穫で、足りない資源を2枚もらえます',
+                monopoly: '独占で、みんなの資源をまとめてもらえます'
+            }[hint.card]);
+        case 'endTurn':
+            if (lacking.length === 0) return act('今は建てる場所がないので、手番を終えます');
+            if (chips.length) return act(...chips, 'で出るので、手番を終えて待ちます');
+            return act('出るタイルがないので、交換で手に入れます。今は手番を終えます');
+        default: return null;
     }
 }
 
@@ -196,7 +169,7 @@ function numberChip({ number, blocked }) {
 
 function renderParts(line, parts) {
     parts.forEach(part => {
-        if (typeof part === 'string') line.append(el('span', 'coach-text', part));
+        if (typeof part === 'string') line.append(part);
         else if (part.icon) {
             const icon = resourceIcon(part.icon, 'mini-icon');
             if (part.dim) icon.classList.add('lack');
@@ -215,16 +188,12 @@ export function renderCoach(container, view, { assist, mode = null } = {}) {
         container.replaceChildren();
         return false;
     }
-    const line = (tag, parts, className = '') => {
-        const row = el('div', `coach-line ${className}`.trim());
-        row.append(el('span', 'coach-tag', tag));
-        const body = el('span', 'coach-body');
-        renderParts(body, parts);
-        row.append(body);
-        return row;
-    };
-    const goal = line('目標', story.goal, 'coach-goal');
-    if (story.points !== null) goal.append(el('span', 'coach-points', `あと${story.points}点`));
-    container.replaceChildren(goal, line('必要', story.need), line('だから', story.action, 'coach-action'));
+    const text = el('p', 'coach-text');
+    story.forEach(sentence => {
+        const span = el('span', sentence.strong ? 'coach-act' : '');
+        renderParts(span, sentence.parts);
+        text.append(span);
+    });
+    container.replaceChildren(text);
     return true;
 }

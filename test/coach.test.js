@@ -15,10 +15,12 @@ const text = (parts) => parts.map(p => {
     if (p.chip) return `(${p.chip.number}${p.chip.blocked ? 'x' : ''})`;
     return '★';
 }).join('');
+// 文章全体（今すること＝太字の文は 《》 で囲む）
 const story = (game, seat, mode) => {
-    const s = coachStory(viewOf(game, seat), mode);
-    return s && { goal: text(s.goal), need: text(s.need), action: text(s.action), points: s.points };
+    const sentences = coachStory(viewOf(game, seat), mode);
+    return sentences && sentences.map(x => (x.strong ? `《${text(x.parts)}》` : text(x.parts))).join('');
 };
+const action = (game, seat, mode) => story(game, seat, mode).match(/《(.*)》/)[1];
 
 // 初期配置をおすすめの手で済ませ、手番の人がサイコロを振ったあとのゲーム
 function playing(seed) {
@@ -36,7 +38,7 @@ function playing(seed) {
 const ownHexes = (game, seat) => [...new Set(game.buildings.flatMap((b, v) => (b?.owner === seat ? GEOMETRY.vertices[v].hexes : [])))]
     .filter(id => game.board.hexes[id].number);
 
-describe('作戦（目標 → 必要 → だから）', () => {
+describe('作戦（状況の説明）', () => {
     it('観戦・ゲームの終わりには出さない', () => {
         const game = playing(1);
         expect(coachStory(viewOf(game, null))).toBeNull();
@@ -44,85 +46,73 @@ describe('作戦（目標 → 必要 → だから）', () => {
         expect(coachStory(viewOf(game, 0))).toBeNull();
     });
 
-    it('初期配置：資源の出る場所を取る理由と、今置くもの', () => {
+    it('初期配置：資源の入り方と、今置くもの', () => {
         const game = new Game(humans(3), { seed: 2 });
         const seat = game.currentPlayerIndex;
         const other = (seat + 1) % 3;
-        expect(story(game, seat)).toMatchObject({ goal: '資源の出る場所に開拓地を置く', need: '資源は、出た目のタイルに接すると出る', action: '点の多い数字の近くに置く★' });
-        expect(story(game, other).action).toBe('点の多い数字・違う資源の場所を探す');
+        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。《点の多い数字の近くに置くと、よく集まります★》');
+        expect(story(game, other)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。点の多い数字の近くが狙い目です。');
         game.applyCommand(seat, createGameView(game, seat).options.suggestion.command);
-        expect(story(game, seat).action).toBe('次の開拓地の方へ道を置く★');
+        expect(story(game, seat)).toBe('開拓地は、道の先にしか建てられません。《次に開拓地を置きたい方へ、道を伸ばします★》');
     });
 
-    it('都市が目標なら、材料（足りないものは薄く）と足りない枚数を出す', () => {
-        const game = playing(5);
-        const seat = game.currentPlayerIndex;
-        game.players[seat].hand = hand({ wheat: 1 });
-        const s = story(game, seat);
-        expect(s.goal).toBe('都市で+1点・資源2倍');
-        expect(s.need).toBe('[wheat][-wheat][-ore][-ore][-ore]小麦・鉄があと4枚');
-        expect(s.points).toBe(10 - viewOf(game, seat).me.points);
-    });
-
-    it('だから：手番を終えるなら、足りない資源が出る自分の数字を待つ', () => {
+    it('都市を目指す理由・足りない資源（足りない材料は薄く）・今することがつながる', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.players[seat].hand = hand({ wheat: 1 });
         const view = viewOf(game, seat);
         expect(view.options.suggestion.command.type).toBe('endTurn');
         const sources = resourceSources(view, seat);
-        const numbers = [...new Set([...sources.wheat, ...sources.ore].filter(s => !s.blocked).map(s => s.number))];
-        const s = story(game, seat);
-        if (numbers.length) expect(s.action).toMatch(/^手番を終え、(\(\d+\))+を待つ★$/);
-        else expect(s.action).toBe('手番を終える。次は交換を狙う★');
+        const numbers = [...sources.wheat, ...sources.ore].filter(x => !x.blocked);
+        const text = story(game, seat);
+        expect(text.startsWith('都市にすると1点増え、資源も2倍です。[wheat][-wheat][-ore][-ore][-ore]のうち、小麦と鉄があと4枚足りません。')).toBe(true);
+        if (numbers.length) expect(action(game, seat)).toMatch(/^(\(\d+\))+で出るので、手番を終えて待ちます★$/);
+        else expect(action(game, seat)).toBe('出るタイルがないので、交換で手に入れます。今は手番を終えます★');
     });
 
-    it('だから：材料が揃えば建てる。銀行と交換できるなら、交換を勧める', () => {
+    it('材料が揃えば建てる。銀行と交換すれば揃うなら、交換を勧める', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.players[seat].hand = hand({ wheat: 2, ore: 3 });
-        expect(story(game, seat)).toMatchObject({ need: '[wheat][wheat][ore][ore][ore]揃っている', action: '材料が揃ったので都市を建てる★' });
+        expect(story(game, seat)).toBe('都市にすると1点増え、資源も2倍です。材料は揃っています。《なので、都市を建てます★》');
         game.players[seat].hand = hand({ wheat: 2, ore: 2, sheep: 4 });
-        expect(story(game, seat).action).toMatch(/^余った\[sheep\]\d枚を\[ore\]に交換★$/);
+        expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を、銀行で\[ore\]に換えれば揃います★$/);
     });
 
-    it('建てる場所を選んでいる間は、光っている場所に建てると言う', () => {
+    it('建てる場所を選んでいる間は、光っている場所から選ぶと言う', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.players[seat].hand = hand({ wheat: 2, ore: 3 });
-        expect(story(game, seat, 'city').action).toBe('光っている場所に都市を建てる★');
+        expect(action(game, seat, 'city')).toBe('光っている場所から、都市を建てる場所を選びます★');
     });
 
     it('相手の番：足りない資源が出る数字を待つ（揃っていれば次の番で建てる）', () => {
         const game = playing(5);
         const seat = (game.currentPlayerIndex + 1) % 3;
         game.players[seat].hand = hand({ wheat: 2, ore: 3 });
-        expect(story(game, seat).action).toBe('揃った。次の番で建てる');
+        expect(action(game, seat)).toBe('次の自分の番で建てられます');
         game.players[seat].hand = hand();
-        expect(story(game, seat).action).toMatch(/が出れば手に入る$|^自分の番に交換で手に入れる$/);
+        expect(action(game, seat)).toMatch(/が出れば手に入ります$|^出るタイルがないので、自分の番に交換します$/);
     });
 
-    it('7で手札を捨てる・盗賊を動かすときは、その理由を出す', () => {
+    it('7で手札を捨てる・盗賊を動かすときは、そのしくみと今することを言う', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.pending = { type: 'robber' };
-        expect(story(game, seat)).toMatchObject({ goal: '盗賊で相手の資源を止める', action: '点の多い相手のタイルを止める★' });
+        expect(story(game, seat)).toBe('盗賊を置いたタイルは資源が出なくなり、そこに建物を持つ人から1枚奪えます。《点の多い相手のタイルを狙います★》');
         game.players[seat].hand = hand({ wood: 4, sheep: 4 });
         game.pending = { type: 'discard', remaining: { [seat]: 4 } };
-        expect(story(game, seat)).toMatchObject({ goal: '7が出た。手札を半分捨てる', action: '目標に使わない資源から4枚捨てる' });
+        expect(story(game, seat)).toBe('7が出たとき、手札が8枚以上あると半分を捨てます。《次に建てたい物に使わない資源から、4枚捨てます》');
     });
 
-    it('交換の申し出には、受けるか断るかを理由と一緒に出す', () => {
+    it('交換の申し出には、何を渡して何をもらうかと、受けるか断るかを言う', () => {
         const game = playing(5);
         const from = game.currentPlayerIndex;
         const seat = (from + 1) % 3;
         game.players[from].hand = hand({ ore: 3 });
         game.players[seat].hand = hand({ wood: 1 });
         game.applyCommand(from, { type: 'offerTrade', give: { ore: 3 }, get: { wood: 1 } });
-        const s = story(game, seat);
-        expect(s.goal).toBe(`P${from}からの交換の申し出`);
-        expect(s.need).toBe('[ore][ore][ore]をもらい[wood]を渡す');
-        expect(s.action).toMatch(/^(目標に要る資源なので受ける|得にならないので断る)★$/);
+        expect(story(game, seat)).toMatch(new RegExp(`^P${from}が、\\[ore\\]\\[ore\\]\\[ore\\]を渡すので\\[wood\\]がほしいそうです。《(欲しい資源が手に入るので、受けます|得にならないので、断ります)★》$`));
     });
 
     it('資源の出どころは、自分の建物が接するタイルの数字（出やすい順。盗賊がいれば blocked）', () => {
@@ -133,21 +123,19 @@ describe('作戦（目標 → 必要 → だから）', () => {
         const sources = resourceSources(viewOf(game, seat), seat);
         RESOURCES.forEach(r => {
             const expected = hexes.filter(id => game.board.hexes[id].terrain === r);
-            expect(sources[r].map(s => s.number).sort()).toEqual(expected.map(id => game.board.hexes[id].number).sort());
-            const pips = sources[r].map(s => 6 - Math.abs(7 - s.number));
+            expect(sources[r].map(x => x.number).sort()).toEqual(expected.map(id => game.board.hexes[id].number).sort());
+            const pips = sources[r].map(x => 6 - Math.abs(7 - x.number));
             expect(pips).toEqual([...pips].sort((a, b) => b - a));
         });
-        const blocked = Object.values(sources).flat().filter(s => s.blocked);
+        const blocked = Object.values(sources).flat().filter(x => x.blocked);
         expect(blocked).toEqual([{ number: game.board.hexes[hexes[0]].number, blocked: true }]);
     });
 
-    it('建てられるものがなければ、発展カードを目標にする', () => {
+    it('建てられるものがなければ、発展カードを目指す', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.players[seat].pieces = { road: 0, settlement: 0, city: 0 };
         game.players[seat].hand = hand({ sheep: 1 });
-        const s = story(game, seat);
-        expect(s.goal).toBe('発展カードで騎士・勝利点');
-        expect(s.need).toBe('[sheep][-wheat][-ore]小麦・鉄があと2枚');
+        expect(story(game, seat).startsWith('建てる物がないので、発展カードを集めます。[sheep][-wheat][-ore]のうち、小麦と鉄があと2枚足りません。')).toBe(true);
     });
 });
