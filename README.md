@@ -131,7 +131,9 @@ API Gateway（WebSocket）・Lambda・DynamoDB を AWS SAM で作ります（東
 
 ### デプロイ
 
-AWS SAM CLI と AWS CLI が必要です。プロフィールは環境変数で渡します。変更内容を表示し、確認してから反映します。
+main ブランチに push すると、GitHub Actions（`.github/workflows/deploy-server.yml`）がテストを走らせ、通ったときだけサーバーを自動でデプロイします。
+
+手元からデプロイするときは、AWS SAM CLI と AWS CLI が必要です。プロフィールは環境変数で渡します。変更内容を表示し、確認してから反映します。
 
 ```bash
 AWS_PROFILE=<プロフィール名> npm run deploy:server
