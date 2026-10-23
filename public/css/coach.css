@@ -1,61 +1,80 @@
-/* ===== 作戦：今、何を目指すか（案内の行の下の2行） ===== */
+/* ===== 作戦：目標 → 必要 → だから（アシストが ON の間は、案内の行の代わりに出す） ===== */
 
 /* 高さは中身によらず固定する（下の手札とボタンが上下に揺れないように） */
 .coach {
     flex: none;
-    height: 46px;
+    height: 66px;
     padding: 3px 8px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     background: var(--panel);
     color: var(--ink);
     border-radius: 8px;
     font-size: 0.78rem;
-    line-height: 19px;
+    line-height: 20px;
 }
 
 .coach-line {
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 19px;
+    height: 20px;
     white-space: nowrap;
-    overflow: hidden;
 }
 
+/* 行の札：目標・必要・だから（幅をそろえて、流れが縦に読めるように） */
 .coach-tag {
     flex: none;
-    padding: 0 5px;
+    width: 3.4em;
+    text-align: center;
     line-height: 16px;
     border-radius: 4px;
     background: var(--sea-deep);
     color: #fff;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 800;
 }
 
-.coach-title {
-    flex: none;
-    font-weight: 800;
+.coach-action .coach-tag {
+    background: var(--gold);
+    color: var(--ink);
 }
 
-.coach-reason,
-.coach-note {
+.coach-body {
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.coach-reason {
-    color: var(--muted);
+.coach-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.coach-note {
-    color: var(--terracotta-dark);
+.coach-goal .coach-body,
+.coach-action .coach-body {
     font-weight: 800;
+}
+
+.coach-body .mini-icon {
+    flex: none;
+}
+
+.coach-body .mini-icon.lack {
+    opacity: 0.3;
+}
+
+.coach-star {
+    flex: none;
+    margin-left: 3px;
+    color: var(--gold);
+    text-shadow: 0 0 2px #6b4a00, 0 0 2px #6b4a00;
 }
 
 .coach-points {
@@ -65,47 +84,16 @@
     color: var(--sea-deep);
 }
 
-/* 2行目：足りない資源と、それが出る数字 */
-.coach-needs {
-    gap: 7px;
-}
-
-.coach-label {
-    flex: none;
-    color: var(--muted);
-}
-
-.coach-need {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.coach-count {
-    font-weight: 800;
-    margin-right: 1px;
-}
-
-.coach-use,
-.coach-trade {
-    color: var(--muted);
-    margin-left: 1px;
-}
-
-.coach-ready {
-    font-weight: 800;
-    color: var(--sea-deep);
-}
-
 /* 数字の札：盤面の札と同じ、クリーム色の丸に数字（6 と 8 は赤） */
 .coach-num {
+    flex: none;
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 17px;
     height: 17px;
+    margin: 0 1px;
     border-radius: 50%;
     background: #fbf3dc;
     border: 1px solid #b9a77a;
@@ -137,9 +125,12 @@
 
 @media (orientation: landscape) and (max-height: 500px) {
     .coach {
-        height: 42px;
+        height: 62px;
         padding: 2px 7px;
-        gap: 1px;
         font-size: 0.74rem;
+    }
+
+    .coach-line {
+        height: 19px;
     }
 }

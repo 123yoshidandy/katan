@@ -539,8 +539,10 @@ export default class UI {
 
         this.renderBoardArea(view);
         this.renderPlayers(view);
-        this.renderGuide(view);
-        renderCoach($('coach'), view, { assist: this.assist });
+        // アシストが ON の間は、作戦の欄（目標 → 必要 → だから）が案内を兼ねる
+        const coached = renderCoach($('coach'), view, { assist: this.assist, mode: this.mode });
+        $('guide').classList.toggle('hidden', coached);
+        if (!coached) this.renderGuide(view);
         this.renderTradeStatus(view);
         this.renderHand(view);
         this.renderActions(view);
@@ -725,41 +727,8 @@ export default class UI {
         return me ? (view.logs.at(-1) ?? '') : '';
     }
 
-    // アシスト：おすすめの手の説明 { text }
-    assistText(view) {
-        const hint = this.hint(view);
-        if (!hint || view.discardCount > 0) return null;
-        if (view.tradeWaiting) return { text: `${view.players[view.trade.from].name}の申し出は${hint.accept ? '受ける' : '断る'}のがおすすめ` };
-        if (view.phase === 'setup') {
-            return { text: view.setup.step === 'settlement' ? '★がおすすめ。数字は資源の出やすさ' : '道の向きを選ぶ（★がおすすめ）' };
-        }
-        if (view.pending?.type === 'robber') return { text: '盗賊を動かす（★がおすすめ）' };
-        if (view.pending?.type === 'roadBuilding') return { text: `道を置く（あと${view.pending.remaining}本・★がおすすめ）` };
-        if (this.mode) {
-            const best = this.bestSpot(view);
-            return { text: `${PIECE_NAMES[this.mode]}を建てる場所を選ぶ${best.vertex !== undefined || best.edge !== undefined ? '（★がおすすめ）' : ''}` };
-        }
-        switch (hint.type) {
-            case 'roll': return null;
-            case 'build': return { text: { settlement: '★ 開拓地を建てる（+1点）', city: '★ 開拓地を都市にする（+1点）', road: '★ 道を伸ばす' }[hint.piece] };
-            case 'bankTrade': return { text: `★ ${RESOURCE_NAMES[hint.give]}${view.options.tradeRatios[hint.give]}枚を${RESOURCE_NAMES[hint.get]}に交換` };
-            case 'buyDevCard': return { text: '★ 発展カードを買う' };
-            case 'playDev': return { text: hint.card === 'knight' ? '★ 騎士で盗賊を動かす' : `★ ${DEV_NAMES[hint.card]}を使う` };
-            // 次の目標と足りない資源は、作戦の欄に出す
-            case 'endTurn': return { text: '★ 手番を終える' };
-            default: return null;
-        }
-    }
-
     renderGuide(view) {
-        const guide = $('guide');
-        const assist = this.assistText(view);
-        if (!assist) {
-            guide.textContent = this.guideText(view);
-            return;
-        }
-        // 文中の★は金色にする
-        guide.replaceChildren(...assist.text.split(/(★)/).filter(Boolean).map(part => (part === '★' ? element('span', { className: 'star', text: '★' }) : part)));
+        $('guide').textContent = this.guideText(view);
     }
 
     renderTradeStatus(view) {

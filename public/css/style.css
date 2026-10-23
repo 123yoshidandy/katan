@@ -774,14 +774,6 @@ input {
     text-overflow: ellipsis;
 }
 
-.guide .star {
-    color: var(--gold);
-}
-
-.guide .cards-line {
-    vertical-align: -2px;
-}
-
 .trade-status {
     flex: none;
     background: var(--panel);
