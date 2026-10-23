@@ -42,6 +42,7 @@ export const DEV_CARDS = { knight: 14, victoryPoint: 5, roadBuilding: 2, yearOfP
 export const DEV_NAMES = { knight: '騎士', victoryPoint: '勝利点', roadBuilding: '街道建設', yearOfPlenty: '収穫', monopoly: '独占' };
 export const PIECE_NAMES = { road: '道', settlement: '開拓地', city: '都市' };
 const MAX_LOGS = 200;
+const MAX_EVENTS = 40; // 演出のために持つ、最近のイベントの数
 
 export const emptyCards = () => Object.fromEntries(RESOURCES.map(r => [r, 0]));
 export const countCards = (cards) => RESOURCES.reduce((sum, r) => sum + (cards[r] ?? 0), 0);
@@ -112,6 +113,9 @@ export default class Game {
 
         this.commands = [];
         this.logs = [];                // { text, secret?: { seats, text } }
+        // 起きたこと（画面の演出に使う）。{ id, type, ... }。受け付けた操作でだけ増える
+        this.events = [];
+        this.eventSerial = 0;
         this.result = null;            // { winnerId, points }
         this.lastError = null;
         this.log(`ゲーム開始。最初は${this.getCurrentPlayer().name}が開拓地を置きます`);
@@ -211,6 +215,7 @@ export default class Game {
         if (!canBuild()) return this.reject(`そこには${PIECE_NAMES[piece]}を置けません`);
 
         if (!free) this.pay(player, COSTS[piece]);
+        this.emit('build', { player: player.id, piece, at, cost: free ? null : { ...COSTS[piece] } });
         this.place(player, piece, at);
         if (free) {
             this.pending.remaining--;
@@ -224,17 +229,23 @@ export default class Game {
         if (piece !== this.setupStep) return this.reject(this.setupStep === 'settlement' ? '開拓地を置いてください' : '道を置いてください');
         if (piece === 'settlement') {
             if (!this.canPlaceSettlementAt(at)) return this.reject('そこには開拓地を置けません');
+            this.emit('build', { player: player.id, piece: 'settlement', at, cost: null });
             this.place(player, 'settlement', at);
             this.lastSettlement = at;
             this.setupStep = 'road';
             // 2巡目の開拓地は、周りのタイルの資源をもらう
             if (this.setupIndex >= this.players.length) {
                 const gained = emptyCards();
+                const gains = [];
                 GEOMETRY.vertices[at].hexes.forEach(hexId => {
                     const { terrain } = this.board.hexes[hexId];
-                    if (RESOURCES.includes(terrain) && this.bank[terrain] > 0) gained[terrain]++;
+                    if (RESOURCES.includes(terrain) && this.bank[terrain] > 0) {
+                        gained[terrain]++;
+                        gains.push({ player: player.id, hex: hexId, resource: terrain, count: 1 });
+                    }
                 });
                 this.pay(player, gained, -1);
+                if (gains.length > 0) this.emit('produce', { gains });
                 this.log(`${player.name}が開拓地を置き、${countCards(gained) ? formatCards(gained) : '何も'}をもらいました`);
             } else {
                 this.log(`${player.name}が開拓地を置きました`);
@@ -244,6 +255,7 @@ export default class Game {
         if (!isInt(at, 0, EDGE_COUNT - 1) || this.roads[at] !== null) return this.reject('そこには道を置けません');
         const { a, b } = GEOMETRY.edges[at];
         if (a !== this.lastSettlement && b !== this.lastSettlement) return this.reject('置いたばかりの開拓地につなげて道を置いてください');
+        this.emit('build', { player: player.id, piece: 'road', at, cost: null });
         this.place(player, 'road', at);
         this.log(`${player.name}が道を置きました`);
         this.setupIndex++;
@@ -333,6 +345,7 @@ export default class Game {
         this.rolled = true;
         const sum = d1 + d2;
         this.log(`${player.name}がサイコロを振りました: ${d1} + ${d2} = ${sum}`);
+        this.emit('roll', { player: player.id, dice: [d1, d2] });
         if (sum === 7) {
             const remaining = {};
             this.players.forEach(p => {
@@ -355,11 +368,17 @@ export default class Game {
     produce(sum) {
         // 資源ごとに、誰が何枚もらうか
         const demand = Object.fromEntries(RESOURCES.map(r => [r, this.players.map(() => 0)]));
+        const sources = []; // { player, hex, resource, count }（演出用。タイルごと・人ごと）
         this.board.hexes.forEach((hex, hexId) => {
             if (hex.number !== sum || hexId === this.robber) return;
             GEOMETRY.hexes[hexId].vertices.forEach(v => {
                 const building = this.buildings[v];
-                if (building) demand[hex.terrain][building.owner] += building.type === 'city' ? 2 : 1;
+                if (!building) return;
+                const n = building.type === 'city' ? 2 : 1;
+                demand[hex.terrain][building.owner] += n;
+                const source = sources.find(s => s.player === building.owner && s.hex === hexId);
+                if (source) source.count += n;
+                else sources.push({ player: building.owner, hex: hexId, resource: hex.terrain, count: n });
             });
         });
         const gains = this.players.map(() => emptyCards());
@@ -374,6 +393,14 @@ export default class Game {
             }
             demand[r].forEach((n, id) => { gains[id][r] = Math.min(n, this.bank[r]); });
         });
+        // 銀行が足りずに減らした分は、タイルの順に割り当て直す
+        const left = gains.map(cards => ({ ...cards }));
+        const produced = sources.map(s => {
+            const count = Math.min(s.count, left[s.player][s.resource]);
+            left[s.player][s.resource] -= count;
+            return { ...s, count };
+        }).filter(s => s.count > 0);
+        if (produced.length > 0) this.emit('produce', { gains: produced });
         const messages = [];
         gains.forEach((cards, id) => {
             if (countCards(cards) === 0) return;
@@ -390,6 +417,7 @@ export default class Game {
         if (!cards || countCards(cards) !== required) return this.reject(`${required}枚を選んで捨ててください`);
         if (!hasCards(player.hand, cards)) return this.reject('持っていない資源は捨てられません');
         this.pay(player, cards);
+        this.emit('discard', { player: player.id, cards });
         delete this.pending.remaining[player.id];
         this.log(`${player.name}が${required}枚捨てました（${formatCards(cards)}）`);
         if (Object.keys(this.pending.remaining).length === 0) {
@@ -414,6 +442,7 @@ export default class Game {
         if (victims.length > 0 && !victims.includes(victim)) return this.reject('奪う相手を選んでください');
         if (victims.length === 0 && victim !== null) return this.reject('そのタイルからは奪えません');
 
+        this.emit('robber', { player: player.id, from: this.robber, to: hex });
         this.robber = hex;
         this.pending = null;
         if (victim === null) {
@@ -425,6 +454,7 @@ export default class Game {
         const stolen = cards[Math.floor(this.random() * cards.length)];
         target.hand[stolen]--;
         player.hand[stolen]++;
+        this.emit('steal', { from: victim, to: player.id, resource: stolen });
         this.log(`${player.name}が盗賊を動かし、${target.name}から1枚奪いました`, {
             seats: [player.id, victim],
             text: `${player.name}が盗賊を動かし、${target.name}から${RESOURCE_NAMES[stolen]}を奪いました`
@@ -442,6 +472,7 @@ export default class Game {
         this.pay(player, COSTS.devCard);
         const type = this.devDeck.pop();
         player.devCards.push({ type, turn: this.turnNumber });
+        this.emit('buyDev', { player: player.id, card: type, cost: { ...COSTS.devCard } });
         this.log(`${player.name}が発展カードを買いました`, { seats: [player.id], text: `${player.name}が発展カード（${DEV_NAMES[type]}）を買いました` });
         return true;
     }
@@ -470,26 +501,34 @@ export default class Game {
             const cards = emptyCards();
             resources.forEach(r => { cards[r]++; });
             if (!hasCards(this.bank, cards)) return this.reject('銀行にその資源が足りません');
+            this.emit('playDev', { player: player.id, card });
             this.pay(player, cards, -1);
+            this.emit('gain', { player: player.id, cards });
             this.log(`${player.name}が収穫を使い、${formatCards(cards)}をもらいました`);
         } else if (card === 'monopoly') {
             if (!RESOURCES.includes(resource)) return this.reject('独占する資源を選んでください');
             let total = 0;
+            const taken = [];
             this.players.forEach(p => {
                 if (p === player) return;
+                if (p.hand[resource] > 0) taken.push({ player: p.id, count: p.hand[resource] });
                 total += p.hand[resource];
                 p.hand[resource] = 0;
             });
             player.hand[resource] += total;
+            this.emit('playDev', { player: player.id, card });
+            this.emit('monopoly', { player: player.id, resource, taken });
             this.log(`${player.name}が独占を使い、${RESOURCE_NAMES[resource]}を${total}枚集めました`);
         } else if (card === 'roadBuilding') {
             const remaining = Math.min(2, player.pieces.road);
             if (remaining === 0 || this.roadSpots(player.id).length === 0) return this.reject('道を置ける場所がありません');
             this.pending = { type: 'roadBuilding', remaining };
+            this.emit('playDev', { player: player.id, card });
             this.log(`${player.name}が街道建設を使いました。道を${remaining}本無料で置けます`);
         } else {
             player.knights++;
             this.pending = { type: 'robber' };
+            this.emit('playDev', { player: player.id, card });
             this.log(`${player.name}が騎士を使いました`);
             this.updateLargestArmy(player);
         }
@@ -522,6 +561,7 @@ export default class Game {
         this.bank[give] += ratio;
         player.hand[get]++;
         this.bank[get]--;
+        this.emit('bankTrade', { player: player.id, give, count: ratio, get });
         this.log(`${player.name}が銀行と交換しました（${RESOURCE_NAMES[give]}${ratio} → ${RESOURCE_NAMES[get]}1）`);
         return true;
     }
@@ -559,6 +599,7 @@ export default class Game {
         addCards(partner.hand, trade.give);
         addCards(partner.hand, trade.get, -1);
         addCards(player.hand, trade.get);
+        this.emit('trade', { from: player.id, to: partnerId, give: { ...trade.give }, get: { ...trade.get } });
         this.trade = null;
         this.log(`${player.name}と${partner.name}が交換しました（${formatCards(trade.give)} ⇄ ${formatCards(trade.get)}）`);
         return true;
@@ -645,6 +686,7 @@ export default class Game {
             next = leaders.length === 1 ? leaders[0].id : null; // 持ち主が抜かれて並んだら、誰のものでもなくなる
         }
         if (next !== holder) {
+            this.emit('award', { award: 'longestRoad', from: holder, to: next });
             this.longestRoad = next;
             this.log(next === null ? '最長交易路は誰のものでもなくなりました' : `${this.players[next].name}が最長交易路（${max}本）を手に入れました`);
         }
@@ -653,6 +695,7 @@ export default class Game {
     updateLargestArmy(player) {
         if (player.knights < LARGEST_ARMY_MIN || this.largestArmy === player.id) return;
         if (this.largestArmy !== null && this.players[this.largestArmy].knights >= player.knights) return;
+        this.emit('award', { award: 'largestArmy', from: this.largestArmy, to: player.id });
         this.largestArmy = player.id;
         this.log(`${player.name}が最大騎士力（騎士${player.knights}枚）を手に入れました`);
     }
@@ -694,6 +737,13 @@ export default class Game {
     log(text, secret = null) {
         this.logs.push(secret ? { text, secret } : { text });
         if (this.logs.length > MAX_LOGS) this.logs.shift();
+    }
+
+    // 起きたことを記録する（通し番号つき。最近の MAX_EVENTS 件だけ持つ）
+    emit(type, data) {
+        this.eventSerial++;
+        this.events.push({ id: this.eventSerial, type, ...data });
+        if (this.events.length > MAX_EVENTS) this.events.shift();
     }
 
     // 参加者・オプション・操作の記録からゲームを再現する

@@ -14,6 +14,8 @@ import { renderBoard, injectSymbols, resourceIcon, pieceIcon, vertexPips, PLAYER
 import { runCpuStep } from './cpu-player.js';
 import { unlockSound, playEffect, toggleSound, isSoundOn, onSoundChange } from './sound.js';
 import NetplayClient from './netplay/netplay-client.mjs';
+import { renderCoach } from './coach.js';
+import { playAnimations } from './animator.js';
 
 const SETUP_KEY = 'katan.setup'; // 開始画面で選んだ人数・名前・CPU
 const ASSIST_KEY = 'katan.assist'; // アシスト（おすすめの手・出やすさなど）の ON/OFF
@@ -538,6 +540,7 @@ export default class UI {
         this.renderBoardArea(view);
         this.renderPlayers(view);
         this.renderGuide(view);
+        renderCoach($('coach'), view, { assist: this.assist });
         this.renderTradeStatus(view);
         this.renderHand(view);
         this.renderActions(view);
@@ -545,6 +548,7 @@ export default class UI {
         this.renderDialogs(view);
         this.renderResult(view);
         this.playSounds(previous, view);
+        playAnimations(previous, view, { board: $('board'), fx: $('fx'), players: $('players'), hand: $('hand'), dice: $('dice') });
         this.lastView = view;
         this.scheduleAutoRoll(view);
     }
@@ -721,11 +725,10 @@ export default class UI {
         return me ? (view.logs.at(-1) ?? '') : '';
     }
 
-    // アシスト：おすすめの手の説明 { text, cards }（cards は足りない資源の図柄）
+    // アシスト：おすすめの手の説明 { text }
     assistText(view) {
         const hint = this.hint(view);
         if (!hint || view.discardCount > 0) return null;
-        const goal = view.options.suggestion.goal;
         if (view.tradeWaiting) return { text: `${view.players[view.trade.from].name}の申し出は${hint.accept ? '受ける' : '断る'}のがおすすめ` };
         if (view.phase === 'setup') {
             return { text: view.setup.step === 'settlement' ? '★がおすすめ。数字は資源の出やすさ' : '道の向きを選ぶ（★がおすすめ）' };
@@ -742,9 +745,8 @@ export default class UI {
             case 'bankTrade': return { text: `★ ${RESOURCE_NAMES[hint.give]}${view.options.tradeRatios[hint.give]}枚を${RESOURCE_NAMES[hint.get]}に交換` };
             case 'buyDevCard': return { text: '★ 発展カードを買う' };
             case 'playDev': return { text: hint.card === 'knight' ? '★ 騎士で盗賊を動かす' : `★ ${DEV_NAMES[hint.card]}を使う` };
-            case 'endTurn':
-                if (!goal) return { text: '★ 手番を終える' };
-                return { text: `★ 手番を終える。次は${PIECE_NAMES[goal.piece]}（あと`, cards: goal.missing, after: '）' };
+            // 次の目標と足りない資源は、作戦の欄に出す
+            case 'endTurn': return { text: '★ 手番を終える' };
             default: return null;
         }
     }
@@ -758,7 +760,6 @@ export default class UI {
         }
         // 文中の★は金色にする
         guide.replaceChildren(...assist.text.split(/(★)/).filter(Boolean).map(part => (part === '★' ? element('span', { className: 'star', text: '★' }) : part)));
-        if (assist.cards) guide.append(cardsLine(assist.cards), assist.after);
     }
 
     renderTradeStatus(view) {

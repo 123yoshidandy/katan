@@ -5,9 +5,23 @@
  */
 
 import { countCards, WIN_POINTS } from './game.js';
-import { suggest } from './cpu-player.js';
+import { suggest, buildGoal } from './cpu-player.js';
 
 const VIEW_LOGS = 60; // ビューに入れる最近のログの数
+const VIEW_EVENTS = 20; // ビューに入れる最近のイベントの数（演出に使う）
+
+// viewerId から見てよい形のイベント（ログの secret と同じ考え方で、中身を伏せる）
+// 奪ったカードは奪った人と奪われた人だけ、捨てたカードは本人だけ（ほかの人には枚数だけ）、買った発展カードは本人だけが見える
+export function publicEvent(event, viewerId) {
+    const copy = JSON.parse(JSON.stringify(event));
+    if (event.type === 'steal' && viewerId !== event.from && viewerId !== event.to) copy.resource = null;
+    if (event.type === 'discard') {
+        copy.count = countCards(event.cards);
+        if (viewerId !== event.player) copy.cards = null;
+    }
+    if (event.type === 'buyDev' && viewerId !== event.player) copy.card = null;
+    return copy;
+}
 
 // viewerId のプレイヤーから見たゲームの状態（観戦や全員CPUのときは viewerId = null）
 export function createGameView(game, viewerId) {
@@ -50,6 +64,9 @@ export function createGameView(game, viewerId) {
                 publicPoints: game.points(player.id, { hidden: false })
             };
         }),
+        // 最後のイベントの番号（演出は、前のビューより新しいイベントだけを見せる）
+        eventId: game.eventSerial,
+        events: game.events.slice(-VIEW_EVENTS).map(event => publicEvent(event, viewerId)),
         logs: game.logs.slice(-VIEW_LOGS).map(entry => (entry.secret?.seats.includes(viewerId) ? entry.secret.text : entry.text)),
         result: game.result ? { ...game.result, points: [...game.result.points] } : null
     };
@@ -62,7 +79,9 @@ export function createGameView(game, viewerId) {
             playableDevCards: game.playableDevCards(viewerId),
             tradeRatios: Object.fromEntries(Object.keys(game.bank).map(r => [r, game.tradeRatio(viewerId, r)])),
             // アシスト：おすすめの手と次の目標（操作する番でなければ null）
-            suggestion: suggest(game, viewerId)
+            suggestion: suggest(game, viewerId),
+            // 作戦：次に建てたいもの（自分の番でなくても出す）
+            goal: buildGoal(game, viewerId)
         };
     }
     return view;

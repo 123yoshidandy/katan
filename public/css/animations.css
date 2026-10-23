@@ -1,0 +1,79 @@
+/* ===== 演出（animator.js）：起きたことを動きで見せる ===== */
+
+/* 演出の層。盤面より上、ダイアログ（最上層）より下。タップは下に通す */
+.fx {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    overflow: hidden;
+}
+
+/* 飛ぶカード。位置は transform で決めるので、中心を基準にする */
+.fx-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    translate: -50% -50%;
+    width: 26px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+    will-change: transform, opacity;
+}
+
+.fx-card .fx-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* 中身の見えないカード（裏向き） */
+.fx-card.back {
+    background: var(--terracotta);
+    border-color: var(--terracotta-dark);
+    box-shadow: inset 0 0 0 3px rgba(255, 250, 240, 0.5), 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* 発展カード（表は名前、裏は紫の無地） */
+.fx-card.dev {
+    width: auto;
+    min-width: 30px;
+    height: 40px;
+    padding: 0 5px;
+    background: #8e6cc0;
+    border-color: #5d4389;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.fx-card.dev.back {
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.35), 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* 最長交易路・最大騎士力の札 */
+.fx-badge {
+    position: absolute;
+    left: 0;
+    top: 0;
+    translate: -50% -50%;
+    background: var(--gold);
+    color: var(--ink);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fx {
+        display: none;
+    }
+}

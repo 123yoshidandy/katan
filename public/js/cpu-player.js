@@ -60,16 +60,18 @@ export function suggest(game, seat) {
     // 交渉を持ちかけている間は、返事を見て相手を選ぶ（おすすめはしない）
     if (game.trade && seat === game.trade.from) return null;
     const command = chooseCommand(game, seat);
-    let goal = null;
-    if (game.phase === 'play' && !game.pending && !game.trade && seat === game.currentPlayerIndex) {
-        const target = buildTarget(game, seat);
-        if (target) {
-            const hand = game.players[seat].hand;
-            const missing = Object.fromEntries(RESOURCES.map(r => [r, Math.max(0, (COSTS[target.piece][r] ?? 0) - hand[r])]));
-            goal = { piece: target.piece, at: target.at, missing };
-        }
-    }
+    const goal = game.phase === 'play' && !game.pending && !game.trade && seat === game.currentPlayerIndex ? buildGoal(game, seat) : null;
     return { command, goal };
+}
+
+// 次に建てたいもの { piece, at, missing }（missing は足りない資源）。自分の番でなくても決める（作戦の表示に使う）
+export function buildGoal(game, seat) {
+    if (game.phase !== 'play') return null;
+    const target = buildTarget(game, seat);
+    if (!target) return null;
+    const hand = game.players[seat].hand;
+    const missing = Object.fromEntries(RESOURCES.map(r => [r, Math.max(0, (COSTS[target.piece][r] ?? 0) - hand[r])]));
+    return { piece: target.piece, at: target.at, missing };
 }
 
 // ===== 評価 =====

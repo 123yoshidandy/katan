@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
     <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/coach.css">
+    <link rel="stylesheet" href="./css/animations.css">
 </head>
 <body>
     <main>
@@ -123,6 +125,8 @@
             <div class="side">
                 <div id="players" class="players"></div>
                 <div id="guide" class="guide" aria-live="polite"></div>
+                <!-- 作戦：今、何を目指すか（アシストが ON のとき） -->
+                <div id="coach" class="coach hidden"></div>
                 <div id="trade-status" class="trade-status hidden"></div>
                 <div id="hand" class="hand"></div>
                 <div id="actions" class="actions">
@@ -286,6 +290,9 @@
             </section>
         </div>
     </dialog>
+
+    <!-- 演出の層（資源が飛ぶなど。タップは下に通す） -->
+    <div id="fx" class="fx" aria-hidden="true"></div>
 
     <div id="toast" class="toast hidden" role="alert"></div>
 
