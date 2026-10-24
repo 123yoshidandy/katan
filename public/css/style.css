@@ -717,10 +717,17 @@ input {
 }
 
 /* 札の中の手札・発展・騎士・道は1行。狭い札では文字を小さくし、さらに狭ければ項目名を1文字にする */
+/* 自分の欄と同じく、右に寄せる */
 .player.tile .stats {
     display: flex;
-    justify-content: space-between;
-    gap: 2px;
+    justify-content: flex-end;
+    gap: 5px;
+}
+
+@container (max-width: 104px) {
+    .player.tile .stats {
+        gap: 2px;
+    }
 }
 
 .player.tile .stat {
