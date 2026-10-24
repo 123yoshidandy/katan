@@ -759,22 +759,29 @@ export default class UI {
         const swatch = element('span', { className: 'swatch' });
         swatch.style.background = PLAYER_COLORS[player.id];
         const name = element('span', { className: 'name', text: player.name });
-        // 手札・発展カードの枚数、使った騎士の数、一番長い道の長さ。最大騎士力・最長交易路（2点）を持っていれば、その欄を金色にする
+        // 手札・発展カードの枚数、使った騎士の数。最大騎士力（2点）を持っていれば騎士の欄を金色にする
+        // 道の長さは盤面でわかるので出さず、最長交易路（2点）を持っている人にだけ金色の「道」を出す
         const stats = element('span', { className: 'stats' });
+        // 項目名は、狭い札では1文字（短い名前）にする（CSS で切り替える）
+        const SHORT = { cards: '札', devs: '発', knights: '騎', roads: '道' };
         const stat = (cls, label, value, title, award = false) => {
             const item = element('span', { className: `stat ${cls}${award ? ' award' : ''}`, title });
-            item.append(element('span', { className: 'stat-label', text: label }), element('span', { className: 'stat-value', text: String(value) }));
+            const name = element('span', { className: 'stat-label' }, [element('span', { className: 'full', text: label }), element('span', { className: 'short', text: SHORT[cls] })]);
+            item.append(name, element('span', { className: 'stat-value', text: String(value) }));
             stats.append(item);
         };
         stat('cards', '手札', player.cardCount, '手札の枚数');
         stat('devs', '発展', player.devCardCount, '発展カードの枚数');
         stat('knights', '騎士', player.knights, view.largestArmy === player.id ? '使った騎士の数（最大騎士力 2点）' : '使った騎士の数', view.largestArmy === player.id);
-        stat('roads', '道', player.roadLength, view.longestRoad === player.id ? '一番長い道の長さ（最長交易路 2点）' : '一番長い道の長さ', view.longestRoad === player.id);
+        // 相手の札では、名前の行（点数の左）に出す
+        if (view.longestRoad === player.id && !tile) stat('roads', '道', player.roadLength, '一番長い道の長さ（最長交易路 2点）', true);
         const points = element('span', { className: 'points', text: String(player.points), title: '勝利点' });
         if (tile) {
             // 札では色の印の代わりに、上の縁をその人の色にする（狭い札でも名前の幅を取れるように）
             row.style.setProperty('--player-color', PLAYER_COLORS[player.id]);
-            const head = element('div', { className: 'tile-head' }, [name, points]);
+            const head = element('div', { className: 'tile-head' }, [name]);
+            if (view.longestRoad === player.id) head.append(element('span', { className: 'stat roads award', text: '道', title: `最長交易路 2点（道の長さ ${player.roadLength}）` }));
+            head.append(points);
             if (player.proxy) head.append(element('span', { className: 'badge muted', text: '代行' }));
             row.append(head, stats);
         } else {
