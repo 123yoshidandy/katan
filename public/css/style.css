@@ -464,12 +464,12 @@ input {
     padding: 4px;
 }
 
-/* サイコロは振った人の色（白の人は目を黒、ほかは目を白） */
+/* サイコロは振った人の色（目は白） */
 .die.owner-0 { background: #d8433b; box-shadow: 0 2px 0 #8f2620, 0 2px 6px rgba(0, 0, 0, 0.3); }
 .die.owner-1 { background: #2f6fd0; box-shadow: 0 2px 0 #1d4787, 0 2px 6px rgba(0, 0, 0, 0.3); }
-.die.owner-2 { background: #f4f1e8; }
+.die.owner-2 { background: #1fa65a; box-shadow: 0 2px 0 #13703b, 0 2px 6px rgba(0, 0, 0, 0.3); }
 .die.owner-3 { background: #ef8a17; box-shadow: 0 2px 0 #a35b0a, 0 2px 6px rgba(0, 0, 0, 0.3); }
-.die.owner-0 i, .die.owner-1 i, .die.owner-3 i { background: #fff; }
+.die[class*="owner-"] i { background: #fff; }
 
 /* 7 は赤い縁取り */
 .dice.seven .die {

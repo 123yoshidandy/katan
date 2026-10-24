@@ -8,7 +8,7 @@ import { GEOMETRY, pips, RESOURCES } from './board.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 export const HEX_SIZE = 60; // 六角形の半径（SVG の座標）
 
-export const PLAYER_COLORS = ['#d8433b', '#2f6fd0', '#f4f1e8', '#ef8a17'];
+export const PLAYER_COLORS = ['#d8433b', '#2f6fd0', '#1fa65a', '#ef8a17']; // 赤・青・緑・オレンジ
 export const TERRAIN_COLORS = {
     wood: '#3f7d3a', brick: '#c0623b', sheep: '#93c35b', wheat: '#e6bf3e', ore: '#8b919b', desert: '#dcc68f'
 };
