@@ -577,12 +577,6 @@ export default class Game {
         this.trade = { id: this.tradeSerial + 1, from: player.id, give, get, responses: {} };
         this.tradeSerial++;
         this.log(`${player.name}が交渉を持ちかけました（${formatCards(give)} → ${formatCards(get)}）`);
-        // 求められた資源を持っていない人は、自動で断る（ログは自分で断ったときと同じ）
-        this.players.forEach(p => {
-            if (p.id === player.id || hasCards(p.hand, get)) return;
-            this.trade.responses[p.id] = 'reject';
-            this.log(`${p.name}が交渉を断りました`);
-        });
         return true;
     }
 

@@ -307,19 +307,6 @@ describe('交換', () => {
         expect(game.trade.responses).toEqual({});
     });
 
-    it('求められた資源を持っていない人は、交渉を自動で断る', () => {
-        const game = afterSetup(3);
-        const id = rolled(game);
-        const [b, c] = [(id + 1) % 3, (id + 2) % 3];
-        game.players[id].hand = cards({ wood: 2 });
-        game.players[b].hand = cards({ sheep: 3 });
-        game.players[c].hand = cards({ ore: 1 });
-        expect(game.applyCommand(id, { type: 'offerTrade', give: { wood: 2 }, get: { ore: 1 } })).toBe(true);
-        expect(game.trade.responses).toEqual({ [b]: 'reject' });
-        expect(game.actors()).toEqual([c, id]);
-        expect(game.applyCommand(b, { type: 'respondTrade', id: game.trade.id, accept: true })).toBe(false);
-    });
-
     it('持っていない資源は出せず、ほかの操作をすると交渉は取り下げになる', () => {
         const game = afterSetup(2);
         const id = rolled(game);
