@@ -520,21 +520,13 @@ input {
     stroke-width: 1.5;
 }
 
+/* 文字の大きさは出やすさで変える（board-view.js の TOKEN_FONT_SIZES） */
 .token text {
-    font-size: 17px;
     font-weight: 800;
     fill: var(--ink);
 }
 
 .token.red text {
-    fill: #c62d1f;
-}
-
-.token .pip {
-    fill: var(--ink);
-}
-
-.token.red .pip {
     fill: #c62d1f;
 }
 

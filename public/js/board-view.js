@@ -184,17 +184,16 @@ const starPoints = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => {
 export const vertexPips = (board, vertexId) => GEOMETRY.vertices[vertexId].hexes
     .reduce((sum, hexId) => sum + pips(board.hexes[hexId].number), 0);
 
+// 数字の札。出やすい数字ほど大きく描く（2・12 が一番小さく、6・8 が一番大きい。6・8 は赤）
+const TOKEN_FONT_SIZES = [0, 13, 15, 18, 21, 24]; // 出やすさ（36回に出る回数）ごとの文字の大きさ
+
 function numberToken(x, y, number, rolled = false) {
     const red = number === 6 || number === 8;
     const group = svg('g', { class: `token${red ? ' red' : ''}${rolled ? ' rolled' : ''}` });
     group.append(svg('circle', { cx: x, cy: y, r: 19 }));
-    const text = svg('text', { x, y: y + 4, 'text-anchor': 'middle' });
+    const text = svg('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': TOKEN_FONT_SIZES[pips(number)] });
     text.textContent = String(number);
     group.append(text);
-    const count = pips(number);
-    for (let i = 0; i < count; i++) {
-        group.append(svg('circle', { class: 'pip', cx: x + (i - (count - 1) / 2) * 4.6, cy: y + 11, r: 1.7 }));
-    }
     return group;
 }
 
