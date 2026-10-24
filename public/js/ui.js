@@ -763,7 +763,8 @@ export default class UI {
                 replies.append(element('button', { className: `small primary${mark(true)}`, text: '受ける', disabled: !canAccept, onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: true }) }));
                 replies.append(element('button', { className: `small${mark(false)}`, text: '断る', onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: false }) }));
             } else {
-                replies.append(element('span', { className: 'reply', text: trade.responses[view.me.id] === 'accept' ? '受けました' : '断りました' }));
+                const answer = trade.responses[view.me.id] === 'accept' ? '受けました' : hasCards(view.me.hand, trade.get) ? '断りました' : '持っていないので断りました';
+                replies.append(element('span', { className: 'reply', text: answer }));
             }
             box.append(replies);
         }
