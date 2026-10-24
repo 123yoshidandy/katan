@@ -38,7 +38,7 @@ export function coachStory(view, mode = null) {
         if (step === 'road') return [say('開拓地は、道の先にしか建てられません。'), act('次に開拓地を置きたい方へ、道を伸ばします')];
         return [
             say('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。'),
-            step === 'settlement' ? act('点の多い数字の近くに置くと、よく集まります') : say('点の多い数字の近くが狙い目です。')
+            step === 'settlement' ? act('7に近い数字（6・8は赤）の近くに置くと、よく集まります') : say('7に近い数字の近くが狙い目です。')
         ];
     }
 
@@ -58,7 +58,7 @@ export function coachStory(view, mode = null) {
 
     // 盗賊を動かす（7 か騎士）
     if (view.isMyTurn && view.pending?.type === 'robber') {
-        return [say('盗賊を置いたタイルは資源が出なくなり、そこに建物を持つ人から1枚奪えます。'), act('点の多い相手のタイルを狙います')];
+        return [say('盗賊を置いたタイルは資源が出なくなり、そこに建物を持つ人から1枚奪えます。'), act('得点の多い相手のタイルを狙います')];
     }
 
     // 街道建設

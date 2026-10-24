@@ -50,8 +50,8 @@ describe('作戦（状況の説明）', () => {
         const game = new Game(humans(3), { seed: 2 });
         const seat = game.currentPlayerIndex;
         const other = (seat + 1) % 3;
-        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。《点の多い数字の近くに置くと、よく集まります★》');
-        expect(story(game, other)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。点の多い数字の近くが狙い目です。');
+        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。《7に近い数字（6・8は赤）の近くに置くと、よく集まります★》');
+        expect(story(game, other)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。7に近い数字の近くが狙い目です。');
         game.applyCommand(seat, createGameView(game, seat).options.suggestion.command);
         expect(story(game, seat)).toBe('開拓地は、道の先にしか建てられません。《次に開拓地を置きたい方へ、道を伸ばします★》');
     });
@@ -99,7 +99,7 @@ describe('作戦（状況の説明）', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.pending = { type: 'robber' };
-        expect(story(game, seat)).toBe('盗賊を置いたタイルは資源が出なくなり、そこに建物を持つ人から1枚奪えます。《点の多い相手のタイルを狙います★》');
+        expect(story(game, seat)).toBe('盗賊を置いたタイルは資源が出なくなり、そこに建物を持つ人から1枚奪えます。《得点の多い相手のタイルを狙います★》');
         game.players[seat].hand = hand({ wood: 4, sheep: 4 });
         game.pending = { type: 'discard', remaining: { [seat]: 4 } };
         expect(story(game, seat)).toBe('7が出たとき、手札が8枚以上あると半分を捨てます。《次に建てたい物に使わない資源から、4枚捨てます》');
