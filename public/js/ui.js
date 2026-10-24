@@ -725,8 +725,10 @@ export default class UI {
         const dice = $('dice');
         dice.replaceChildren();
         if (!view.dice) return;
+        // サイコロは、振った人の色にする（最後のサイコロのイベントから。なければ手番の人）
+        const roller = [...(view.events ?? [])].reverse().find(e => e.type === 'roll')?.player ?? view.currentPlayerId;
         view.dice.forEach(value => {
-            const die = element('span', { className: `die face-${value}` });
+            const die = element('span', { className: `die face-${value} owner-${roller}` });
             for (let i = 0; i < value; i++) die.append(element('i'));
             dice.append(die);
         });

@@ -2,7 +2,7 @@
  * 演出：前のビューから新しく起きたこと（ゲームのイベント）を、動きで見せる
  * 動きは #fx（画面全体に重ねた層）の中に描き、終わったら消す。操作は止めない
  *
- * - サイコロ：転がって止まる
+ * - サイコロ：振った人の色のサイコロを、自分なら盤面の手前から、ほかの人なら奥から、中央へ投げ込む
  * - 生産：出た目のタイルから、資源がもらった人へ飛ぶ（自分なら手札の欄、他人ならその人の行）
  * - 建設：払った資源が建てる場所へ飛び、建物・道が上からストンと置かれる
  * - 盗賊：前のタイルから新しいタイルへ跳ぶ。奪ったカードが奪われた人から奪った人へ飛ぶ
@@ -16,7 +16,8 @@ import { HEX_SIZE, resourceIcon } from './board-view.js';
 import { RESOURCES, DEV_NAMES } from './game.js';
 
 const FLIGHT_MS = 560;   // カードが飛ぶ時間
-const DICE_MS = 420;     // サイコロが転がる時間
+const THROW_MS = 700;    // サイコロを投げてから止まるまで
+const DICE_HOLD_MS = 600; // 止まったサイコロを中央に見せておく時間
 const DROP_MS = 380;     // 建物が落ちる時間
 const ROBBER_MS = 480;   // 盗賊が跳ぶ時間
 const STAGGER_MS = 70;   // 何枚も飛ぶときの間隔
@@ -83,9 +84,10 @@ function attach(entry) {
 // ===== イベントごとの演出（始める時刻 t を受け取り、次の演出を始める時刻を返す） =====
 
 const PLAYERS = {
-    roll(stage, event, t) {
-        stage.rollDice(t);
-        return t + DICE_MS - 80;
+    roll(stage, { player, dice }, t) {
+        stage.throwDice(player, dice, t);
+        // 資源が飛ぶのは、サイコロが止まってから
+        return t + THROW_MS;
     },
 
     produce(stage, { gains }, t) {
@@ -264,16 +266,55 @@ function createStage(view, refs) {
             });
         },
 
-        rollDice(delay) {
-            [...refs.dice.querySelectorAll('.die')].forEach((die, i) => {
-                const turn = i === 0 ? -1 : 1;
-                animateLasting(refs.dice, '.die', i, [
-                    { transform: `translate(${40 + i * 14}px, -46px) rotate(${turn * 300}deg)`, opacity: 0 },
-                    { transform: `translate(${18 + i * 6}px, -18px) rotate(${turn * 150}deg)`, opacity: 1, offset: 0.4 },
-                    { transform: 'translate(0, 0) rotate(0deg)', offset: 0.78 },
-                    { transform: 'translate(0, -4px) rotate(0deg)', offset: 0.88 },
-                    { transform: 'translate(0, 0) rotate(0deg)' }
-                ], { duration: DICE_MS, delay: delay + i * 60, easing: 'ease-out', fill: 'backwards' });
+        // 振った人の色のサイコロを、盤面の中央へ投げ込む
+        // 自分：手前（盤面の下）から、大きく見えている状態から奥へ遠ざかるように小さくなりながら
+        // ほかの人：奥（盤面の上）から、小さい状態から近づくように大きくなりながら。奥のどこから来るかは人ごとに変える
+        throwDice(player, values, delay) {
+            const rect = board.getBoundingClientRect();
+            if (!rect.width || !values) return;
+            const mine = isMe(player);
+            const others = view.players.map(p => p.id).filter(id => !isMe(id));
+            const lane = others.length > 1 ? others.indexOf(player) / (others.length - 1) : 0.5;
+            const start = mine
+                ? { x: rect.left + rect.width * 0.5, y: rect.bottom + 30 }
+                : { x: rect.left + rect.width * (0.25 + 0.5 * lane), y: rect.top - 30 };
+            const end = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            const total = THROW_MS + DICE_HOLD_MS;
+            const landed = THROW_MS / total;
+            values.forEach((value, i) => {
+                const die = dieElement(value, player);
+                const side = i === 0 ? -1 : 1;
+                const a = { x: start.x + side * 14, y: start.y };
+                const b = { x: end.x + side * 22, y: end.y + side * 4 };
+                const turn = side * (mine ? 1 : -1);
+                const frames = [];
+                const steps = 10;
+                for (let k = 0; k <= steps; k++) {
+                    const p = k / steps;
+                    const e = 1 - (1 - p) * (1 - p); // だんだん遅くなる
+                    const x = a.x + (b.x - a.x) * e;
+                    // 放物線で少し浮かせる
+                    const y = a.y + (b.y - a.y) * e - 50 * 4 * e * (1 - e);
+                    const scale = mine ? 1.8 - 0.8 * e : 0.55 + 0.45 * e;
+                    frames.push({ offset: p * landed * 0.82, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(turn * 540 * (1 - e)).toFixed(0)}deg) scale(${scale.toFixed(3)})`, opacity: 1 });
+                }
+                // 着いたら小さくはねて止まる
+                const rest = `translate(${b.x.toFixed(1)}px, ${b.y.toFixed(1)}px)`;
+                frames.push({ offset: landed * 0.91, transform: `${rest} translateY(-8px) rotate(0deg) scale(1)`, opacity: 1 });
+                frames.push({ offset: landed, transform: `${rest} rotate(0deg) scale(1)`, opacity: 1 });
+                frames.push({ offset: landed + (1 - landed) * 0.75, transform: `${rest} rotate(0deg) scale(1)`, opacity: 1 });
+                frames.push({ offset: 1, transform: `${rest} rotate(0deg) scale(1)`, opacity: 0 });
+                die.style.opacity = '0';
+                fx.append(die);
+                const animation = die.animate(frames, { duration: total, delay: delay + i * 40, easing: 'linear', fill: 'backwards' });
+                const done = () => die.remove();
+                animation.finished.then(done, done);
+                setTimeout(done, delay + total + 1000);
+            });
+            // 左下の欄のサイコロは、投げたサイコロが止まってから出す
+            [...refs.dice.querySelectorAll('.die')].forEach((_, i) => {
+                animateLasting(refs.dice, '.die', i, [{ opacity: 0 }, { opacity: 0, offset: 0.8 }, { opacity: 1 }],
+                    { duration: THROW_MS + DICE_HOLD_MS * 0.6, delay, fill: 'backwards' });
             });
         },
 
@@ -312,6 +353,13 @@ function createStage(view, refs) {
         }
     };
     return stage;
+}
+
+// 振った人の色のサイコロ（左下の欄と同じ形）
+function dieElement(value, owner) {
+    const die = element('div', `die fx-die face-${value} owner-${owner}`);
+    for (let i = 0; i < value; i++) die.append(document.createElement('i'));
+    return die;
 }
 
 // 着いた先を小さく弾ませる

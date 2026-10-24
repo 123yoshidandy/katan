@@ -77,3 +77,10 @@
         display: none;
     }
 }
+
+/* 投げ込むサイコロ（左上を原点にして、transform で動かす） */
+.fx-die {
+    position: absolute;
+    left: -15px;
+    top: -15px;
+}
