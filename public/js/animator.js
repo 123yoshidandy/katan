@@ -194,7 +194,7 @@ function createStage(view, refs) {
     // 描き直しで要素が替わるので、要素は使うときに探し直す
     const seatElement = (seat, kind) => {
         if (isMe(seat) && RESOURCES.includes(kind)) return refs.hand.querySelector(`.res-${kind}`);
-        const row = refs.players.querySelector(`[data-seat="${seat}"]`);
+        const row = refs.players.querySelector(`.player[data-seat="${seat}"]`);
         if (!row) return null;
         if (kind === 'dev') return row.querySelector('.stat.devs') ?? row;
         if (typeof kind === 'string' && kind.startsWith('award:')) {
@@ -275,9 +275,13 @@ function createStage(view, refs) {
             const mine = isMe(player);
             const others = view.players.map(p => p.id).filter(id => !isMe(id));
             const lane = others.length > 1 ? others.indexOf(player) / (others.length - 1) : 0.5;
+            // ほかの人は、その人の札の真上から（縦画面）。札が盤面の横にあるとき（横画面）は、並び順で左・中央・右から
+            const tile = refs.players.querySelector(`.player.tile[data-seat="${player}"]`)?.getBoundingClientRect();
+            const tileX = tile && tile.width ? tile.left + tile.width / 2 : null;
+            const fromTile = tileX !== null && tileX > rect.left && tileX < rect.right;
             const start = mine
                 ? { x: rect.left + rect.width * 0.5, y: rect.bottom + 30 }
-                : { x: rect.left + rect.width * (0.25 + 0.5 * lane), y: rect.top - 30 };
+                : { x: fromTile ? tileX : rect.left + rect.width * (0.25 + 0.5 * lane), y: rect.top - 30 };
             const end = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             const total = THROW_MS + DICE_HOLD_MS;
             const landed = THROW_MS / total;

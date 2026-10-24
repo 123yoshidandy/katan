@@ -99,7 +99,8 @@
             </div>
         </section>
 
-        <!-- ゲーム画面：横画面では左に盤面・右に操作、縦画面では上に盤面・下に操作 -->
+        <!-- ゲーム画面：相手は奥（縦画面では盤面の上、横画面では右の列の上）に横並び、自分は手前（手札の上）
+             横画面では左に盤面・右に操作、縦画面では上に盤面・下に操作 -->
         <section id="screen-game" class="screen hidden">
             <div class="board-area">
                 <svg id="board" aria-label="盤面"></svg>
@@ -137,11 +138,13 @@
                 <div id="stamps" class="stamps hidden"></div>
             </div>
             <div class="side">
-                <div id="players" class="players"></div>
+                <!-- 縦画面では、CSS で盤面の上に出す -->
+                <div id="opponents" class="opponents"></div>
                 <div id="guide" class="guide" aria-live="polite"></div>
                 <!-- 作戦：今、何を目指すか（アシストが ON のとき） -->
                 <div id="coach" class="coach hidden"></div>
                 <div id="trade-status" class="trade-status hidden"></div>
+                <div id="me-row" class="me-row"></div>
                 <div id="hand" class="hand"></div>
                 <div id="actions" class="actions">
                     <button id="act-road" data-piece="road">道</button>
@@ -256,7 +259,8 @@
             </section>
             <section>
                 <h3>👥 プレイヤーの欄</h3>
-                <p>名前の右に、<strong>手札</strong>（資源カードの枚数）・<strong>発展</strong>（発展カードの枚数）・<strong>騎士</strong>（使った騎士の数）・<strong>道</strong>（一番長くつながった道の長さ）を出し、右端が<strong>得点</strong>です。最大騎士力・最長交易路（各2点）を持っている人は、騎士・道の欄が金色になります。</p>
+                <p>相手の欄は画面の奥（縦画面では盤面の上、横画面では右の列の上）に横に並び、自分の欄は手札の上に出ます。相手の欄は、上の縁がその人の色です。</p>
+                <p>名前の右（相手の欄では名前の下）に、<strong>手札</strong>（資源カードの枚数）・<strong>発展</strong>（発展カードの枚数）・<strong>騎士</strong>（使った騎士の数）・<strong>道</strong>（一番長くつながった道の長さ）を出し、右端が<strong>得点</strong>です。最大騎士力・最長交易路（各2点）を持っている人は、騎士・道の欄が金色になります。</p>
             </section>
             <section>
                 <h3>🏝️ 島と資源</h3>

@@ -538,7 +538,7 @@ export default class UI {
     }
 
     showStamp(seat, stamp) {
-        const row = document.querySelector(`#players [data-seat="${seat}"]`);
+        const row = document.querySelector(`#screen-game .player[data-seat="${seat}"]`);
         if (!row) return;
         const bubble = element('span', { className: 'stamp-bubble', text: stamp });
         row.append(bubble);
@@ -584,7 +584,7 @@ export default class UI {
         this.renderDialogs(view);
         this.renderResult(view);
         this.playSounds(previous, view);
-        playAnimations(previous, view, { board: $('board'), fx: $('fx'), players: $('players'), hand: $('hand'), dice: $('dice') });
+        playAnimations(previous, view, { board: $('board'), fx: $('fx'), players: $('screen-game'), hand: $('hand'), dice: $('dice') });
         this.lastView = view;
         this.scheduleAutoRoll(view);
         this.scheduleAutoReject(view);
@@ -735,32 +735,53 @@ export default class UI {
         dice.classList.toggle('seven', view.dice[0] + view.dice[1] === 7);
     }
 
+    // 相手は奥（#opponents）に、自分の次の手番の人から順に左から並べる。自分は手前（#me-row、手札の上）に1行で出す
+    // 観戦（自分がいない）のときは、全員を奥に並べる
     renderPlayers(view) {
-        const list = $('players');
-        list.replaceChildren(...view.players.map(player => {
-            const row = element('div', { className: 'player' });
-            row.dataset.seat = player.id;
-            row.classList.toggle('current', player.id === view.currentPlayerId && view.phase !== 'end');
-            row.classList.toggle('me', player === view.me);
-            const swatch = element('span', { className: 'swatch' });
-            swatch.style.background = PLAYER_COLORS[player.id];
-            const name = element('span', { className: 'name', text: player.name });
-            // 手札・発展カードの枚数、使った騎士の数、一番長い道の長さ。最大騎士力・最長交易路（2点）を持っていれば、その欄を金色にする
-            const stats = element('span', { className: 'stats' });
-            const stat = (cls, label, value, title, award = false) => {
-                const item = element('span', { className: `stat ${cls}${award ? ' award' : ''}`, title });
-                item.append(element('span', { className: 'stat-label', text: label }), element('span', { className: 'stat-value', text: String(value) }));
-                stats.append(item);
-            };
-            stat('cards', '手札', player.cardCount, '手札の枚数');
-            stat('devs', '発展', player.devCardCount, '発展カードの枚数');
-            stat('knights', '騎士', player.knights, view.largestArmy === player.id ? '使った騎士の数（最大騎士力 2点）' : '使った騎士の数', view.largestArmy === player.id);
-            stat('roads', '道', player.roadLength, view.longestRoad === player.id ? '一番長い道の長さ（最長交易路 2点）' : '一番長い道の長さ', view.longestRoad === player.id);
-            const points = element('span', { className: 'points', text: String(player.points), title: '勝利点' });
+        const me = view.me;
+        const count = view.players.length;
+        const others = me
+            ? Array.from({ length: count - 1 }, (_, i) => view.players[(me.id + 1 + i) % count])
+            : view.players;
+        const opponents = $('opponents');
+        opponents.replaceChildren(...others.map(player => this.playerRow(view, player, { tile: true })));
+        opponents.style.setProperty('--count', String(others.length));
+        $('me-row').replaceChildren(...(me ? [this.playerRow(view, me)] : []));
+        $('me-row').classList.toggle('hidden', !me);
+    }
+
+    // プレイヤーの欄。tile：相手の札（1段目に名前と点数、その下に手札・発展・騎士・道）
+    playerRow(view, player, { tile = false } = {}) {
+        const row = element('div', { className: `player${tile ? ' tile' : ''}` });
+        row.dataset.seat = player.id;
+        row.classList.toggle('current', player.id === view.currentPlayerId && view.phase !== 'end');
+        row.classList.toggle('me', player === view.me);
+        const swatch = element('span', { className: 'swatch' });
+        swatch.style.background = PLAYER_COLORS[player.id];
+        const name = element('span', { className: 'name', text: player.name });
+        // 手札・発展カードの枚数、使った騎士の数、一番長い道の長さ。最大騎士力・最長交易路（2点）を持っていれば、その欄を金色にする
+        const stats = element('span', { className: 'stats' });
+        const stat = (cls, label, value, title, award = false) => {
+            const item = element('span', { className: `stat ${cls}${award ? ' award' : ''}`, title });
+            item.append(element('span', { className: 'stat-label', text: label }), element('span', { className: 'stat-value', text: String(value) }));
+            stats.append(item);
+        };
+        stat('cards', '手札', player.cardCount, '手札の枚数');
+        stat('devs', '発展', player.devCardCount, '発展カードの枚数');
+        stat('knights', '騎士', player.knights, view.largestArmy === player.id ? '使った騎士の数（最大騎士力 2点）' : '使った騎士の数', view.largestArmy === player.id);
+        stat('roads', '道', player.roadLength, view.longestRoad === player.id ? '一番長い道の長さ（最長交易路 2点）' : '一番長い道の長さ', view.longestRoad === player.id);
+        const points = element('span', { className: 'points', text: String(player.points), title: '勝利点' });
+        if (tile) {
+            // 札では色の印の代わりに、上の縁をその人の色にする（狭い札でも名前の幅を取れるように）
+            row.style.setProperty('--player-color', PLAYER_COLORS[player.id]);
+            const head = element('div', { className: 'tile-head' }, [name, points]);
+            if (player.proxy) head.append(element('span', { className: 'badge muted', text: '代行' }));
+            row.append(head, stats);
+        } else {
             row.append(swatch, name, stats, points);
             if (player.proxy) row.append(element('span', { className: 'badge muted', text: '代行' }));
-            return row;
-        }));
+        }
+        return row;
     }
 
     // 今すべきこと。なければ最新の出来事

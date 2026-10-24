@@ -678,11 +678,48 @@ input {
     overflow: hidden;
 }
 
-.players {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+/* 相手：奥に横並びの札。自分：手札の上に1行 */
+.opponents {
     flex: none;
+    display: grid;
+    grid-template-columns: repeat(var(--count, 3), minmax(0, 1fr));
+    gap: 4px;
+}
+
+.me-row {
+    flex: none;
+}
+
+/* 相手の札：1段目に名前と点数、その下に手札・発展・騎士・道 */
+.player.tile {
+    container-type: inline-size;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+    height: auto;
+    padding: 5px 6px 3px;
+    box-shadow: inset 0 4px 0 var(--player-color);
+}
+
+.tile-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.player.tile .stats {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    justify-content: start;
+    gap: 0 6px;
+}
+
+/* 札が広ければ、4つを1行に */
+@container (min-width: 170px) {
+    .player.tile .stats {
+        grid-template-columns: repeat(4, auto);
+    }
 }
 
 .player {
@@ -721,6 +758,7 @@ input {
 
 /* 手札・発展・騎士・道：小さい項目名と、太い数 */
 .stat {
+    white-space: nowrap;
     display: inline-flex;
     align-items: baseline;
     gap: 1px;
@@ -1189,6 +1227,16 @@ dialog::backdrop {
 @media (orientation: portrait) {
     #screen-game {
         flex-direction: column;
+        gap: 5px;
+    }
+
+    /* 右の列の中身を画面に直接並べ、相手の札だけを盤面の上（奥）に出す */
+    .side {
+        display: contents;
+    }
+
+    .opponents {
+        order: -1;
     }
 
     .board-area {
