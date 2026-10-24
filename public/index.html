@@ -52,6 +52,13 @@
                                 <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
                             </svg>
                         </button>
+                        <button class="small icon open-settings" aria-label="設定" title="設定">
+                            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>
+                                <circle cx="12" cy="12" r="6.5"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -114,6 +121,13 @@
                         <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/>
                             <path class="assist-off" d="M4 4l16 16"/>
+                        </svg>
+                    </button>
+                    <button class="small icon open-settings" aria-label="設定" title="設定">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>
+                            <circle cx="12" cy="12" r="6.5"/>
                         </svg>
                     </button>
                     <button id="stamp-button" class="small icon hidden" aria-label="スタンプ">
@@ -212,6 +226,19 @@
         <div id="victim-list" class="buttons column"></div>
         <div class="buttons">
             <button id="victim-cancel">タイルを選び直す</button>
+        </div>
+    </dialog>
+
+    <!-- 設定（ブラウザに保存する） -->
+    <dialog id="settings-dialog" class="sheet" tabindex="-1">
+        <div class="sheet-head">
+            <h2>設定</h2>
+            <button class="small icon close-dialog" aria-label="閉じる">✕</button>
+        </div>
+        <div class="settings">
+            <label class="setting"><span>効果音</span><input type="checkbox" id="set-sound"></label>
+            <label class="setting"><span>アシスト（説明と★）</span><input type="checkbox" id="set-assist"></label>
+            <label class="setting"><span>持っていない資源の交渉は、自動で断る</span><input type="checkbox" id="set-auto-reject"></label>
         </div>
     </dialog>
 

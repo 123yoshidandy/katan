@@ -19,6 +19,7 @@ import { playAnimations } from './animator.js';
 
 const SETUP_KEY = 'katan.setup'; // 開始画面で選んだ人数・名前・CPU
 const ASSIST_KEY = 'katan.assist'; // アシスト（おすすめの手・出やすさなど）の ON/OFF
+const AUTO_REJECT_KEY = 'katan.autoReject'; // 求められた資源を持っていない交渉を、自動で断るか
 const TOAST_MS = 2500;
 const AUTO_ROLL_DELAY_MS = 700;  // サイコロを振るしかないとき、自動で振るまでの間
 const STAMP_MS = 2500;
@@ -61,17 +62,18 @@ function saveSetup(setup) {
     }
 }
 
-function loadAssist() {
+// ON/OFF の設定（初めは ON）
+function loadSwitch(key) {
     try {
-        return localStorage.getItem(ASSIST_KEY) !== 'off';
+        return localStorage.getItem(key) !== 'off';
     } catch {
         return true;
     }
 }
 
-function saveAssist(on) {
+function saveSwitch(key, on) {
     try {
-        localStorage.setItem(ASSIST_KEY, on ? 'on' : 'off');
+        localStorage.setItem(key, on ? 'on' : 'off');
     } catch {
         // 保存できなくても遊べる
     }
@@ -101,7 +103,9 @@ export default class UI {
         this.discardChoice = {};
         this.devChoice = null;  // 収穫・独占で選んでいる資源 { card, picks }
         this.robberHex = null;  // 奪う相手を選んでいる盗賊の行き先
-        this.assist = loadAssist();
+        this.assist = loadSwitch(ASSIST_KEY);
+        this.autoReject = loadSwitch(AUTO_REJECT_KEY);
+        this.autoRejectedTrade = null; // 自動で断った交渉の番号（同じ交渉に何度も送らない）
         injectSymbols();
         this.bindEvents();
         this.renderTitleArt();
@@ -190,15 +194,30 @@ export default class UI {
         $('help-button').addEventListener('click', () => this.openDialog('help-dialog'));
         $('menu-button').addEventListener('click', () => this.goHome());
         document.querySelectorAll('.sound-toggle').forEach(button => button.addEventListener('click', () => toggleSound()));
-        onSoundChange(() => this.renderSoundButtons());
+        onSoundChange(() => {
+            this.renderSoundButtons();
+            this.renderSettings();
+        });
         $('stamp-button').addEventListener('click', () => $('stamps').classList.toggle('hidden'));
         document.querySelectorAll('.assist-toggle').forEach(button => button.addEventListener('click', () => {
-            this.assist = !this.assist;
-            saveAssist(this.assist);
-            this.renderAssistButtons();
+            this.setAssist(!this.assist);
             this.toast(`アシスト ${this.assist ? 'ON' : 'OFF'}`);
-            this.renderGame();
         }));
+
+        // 設定
+        document.querySelectorAll('.open-settings').forEach(button => button.addEventListener('click', () => {
+            this.renderSettings();
+            this.showModal($('settings-dialog'));
+        }));
+        $('set-sound').addEventListener('change', () => {
+            if ($('set-sound').checked !== isSoundOn()) toggleSound();
+        });
+        $('set-assist').addEventListener('change', () => this.setAssist($('set-assist').checked));
+        $('set-auto-reject').addEventListener('change', () => {
+            this.autoReject = $('set-auto-reject').checked;
+            saveSwitch(AUTO_REJECT_KEY, this.autoReject);
+            this.renderGame();
+        });
 
         // ダイアログ：✕ と外側のタップで閉じる（手札を捨てるダイアログは閉じられない）
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -292,6 +311,20 @@ export default class UI {
         });
     }
 
+    setAssist(on) {
+        this.assist = on;
+        saveSwitch(ASSIST_KEY, on);
+        this.renderAssistButtons();
+        this.renderSettings();
+        this.renderGame();
+    }
+
+    renderSettings() {
+        $('set-sound').checked = isSoundOn();
+        $('set-assist').checked = this.assist;
+        $('set-auto-reject').checked = this.autoReject;
+    }
+
     renderAssistButtons() {
         document.querySelectorAll('.assist-toggle').forEach(button => {
             button.classList.toggle('off', !this.assist);
@@ -372,6 +405,7 @@ export default class UI {
         this.controller?.stop?.();
         this.localPlayers = players;
         this.lastView = null;
+        this.autoRejectedTrade = null;
         this.mode = null;
         this.controller = new LocalGameController(players, {
             onUpdate: () => this.renderGame(),
@@ -553,6 +587,22 @@ export default class UI {
         playAnimations(previous, view, { board: $('board'), fx: $('fx'), players: $('players'), hand: $('hand'), dice: $('dice') });
         this.lastView = view;
         this.scheduleAutoRoll(view);
+        this.scheduleAutoReject(view);
+    }
+
+    // 設定が ON なら、求められた資源を持っていない交渉は自動で断る（描画が終わってから送る）
+    scheduleAutoReject(view) {
+        const trade = view.trade;
+        if (!this.autoReject || !view.tradeWaiting || hasCards(view.me.hand, trade.get)) return;
+        const key = `${this.matchId ?? 'local'}:${view.me.id}:${trade.id}`;
+        if (this.autoRejectedTrade === key) return;
+        this.autoRejectedTrade = key;
+        setTimeout(() => {
+            const current = this.view();
+            if (current?.tradeWaiting && current.trade.id === trade.id && current.me.id === view.me.id) {
+                this.send({ type: 'respondTrade', id: trade.id, accept: false });
+            }
+        }, 0);
     }
 
     // 自分が今、手番の操作（建設・交換など）をできるか

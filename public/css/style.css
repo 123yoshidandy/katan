@@ -132,6 +132,34 @@ button.link {
 .sound-toggle.off .sound-on { display: none; }
 .sound-toggle.off .sound-off { display: inline; }
 .sound-toggle.off { color: var(--muted); }
+/* 設定：項目名と、右にスイッチ */
+.settings {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--sand-dark);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.setting input {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    accent-color: var(--sea-deep);
+    cursor: pointer;
+}
+
 .assist-toggle .assist-off { display: none; }
 .assist-toggle.off .assist-off { display: inline; }
 .assist-toggle.off { color: var(--muted); }
