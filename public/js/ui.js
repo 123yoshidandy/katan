@@ -913,7 +913,8 @@ export default class UI {
     }
 
     // 資源ごとの枚数を選ぶ欄（max: 資源ごとの上限、total: 全体の上限）
-    renderPicker(container, choice, { max, total = Infinity, onChange }) {
+    // owned: 資源ごとの手持ちの枚数（渡すと、各資源の下に「手持ち n」を出す）
+    renderPicker(container, choice, { max, total = Infinity, owned = null, onChange }) {
         container.replaceChildren();
         const sum = countCards({ ...Object.fromEntries(RESOURCES.map(r => [r, 0])), ...choice });
         RESOURCES.forEach(r => {
@@ -935,7 +936,9 @@ export default class UI {
                     onChange();
                 }
             });
-            cell.append(plus, minus);
+            cell.append(plus);
+            if (owned) cell.append(element('span', { className: 'owned', text: `手持ち ${owned(r)}` }));
+            cell.append(minus);
             container.append(cell);
         });
     }
@@ -945,7 +948,7 @@ export default class UI {
         const chosen = countCards({ ...Object.fromEntries(RESOURCES.map(r => [r, 0])), ...this.discardChoice });
         $('discard-note').textContent = chosen < required ? `あと${required - chosen}枚選んでください` : `${required}枚を捨てます`;
         this.renderPicker($('discard-picker'), this.discardChoice, {
-            max: (r) => view.me.hand[r], total: required,
+            max: (r) => view.me.hand[r], total: required, owned: (r) => view.me.hand[r],
             onChange: () => this.renderDiscardDialog(view)
         });
         $('discard-confirm').disabled = chosen !== required;
@@ -994,7 +997,7 @@ export default class UI {
 
         // プレイヤーとの交渉
         const rerender = () => this.renderTradeDialog(this.view());
-        this.renderPicker($('offer-give'), this.offer.give, { max: (r) => me.hand[r] - 0, onChange: rerender });
+        this.renderPicker($('offer-give'), this.offer.give, { max: (r) => me.hand[r], owned: (r) => me.hand[r], onChange: rerender });
         this.renderPicker($('offer-get'), this.offer.get, { max: () => 9, onChange: rerender });
         const sum = (cards) => Object.values(cards).reduce((a, b) => a + b, 0);
         const overlap = RESOURCES.some(r => this.offer.give[r] > 0 && this.offer.get[r] > 0);

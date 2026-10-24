@@ -1078,6 +1078,14 @@ dialog::backdrop {
     align-items: stretch;
 }
 
+/* 手持ちの枚数（捨てる・交渉で出すとき） */
+.pick .owned {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1;
+}
+
 .pick .minus {
     padding: 1px 0;
     font-weight: 800;
