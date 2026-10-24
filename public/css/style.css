@@ -710,52 +710,32 @@ input {
     flex: none;
 }
 
+/* 手札・発展・騎士・道：小さい項目名と、太い数 */
 .stat {
     display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    font-size: 0.78rem;
+    align-items: baseline;
+    gap: 1px;
+    padding: 0 2px;
+    border-radius: 4px;
+}
+
+.stat-label {
+    font-size: 0.62rem;
     color: var(--muted);
 }
 
-/* 小さな印（手札・発展カード・騎士・道） */
-.stat::before {
-    content: "";
-    display: inline-block;
-    width: 8px;
-    height: 11px;
-    border-radius: 2px;
-    border: 1.5px solid currentColor;
-}
-
-.stat.devs::before {
-    background: #8e6cc0;
-    border-color: #5d4389;
-}
-
-.stat.knights::before {
-    width: 9px;
-    height: 10px;
-    border-radius: 2px 2px 5px 5px;
-    background: #a33;
-    border-color: #6d1f1f;
-}
-
-.stat.roads::before {
-    width: 11px;
-    height: 4px;
-    border-radius: 2px;
-    background: #8a6a3f;
-    border-color: #5b4425;
-    transform: rotate(-30deg);
-}
-
-.award {
-    font-size: 0.66rem;
-    background: var(--gold);
-    border-radius: 5px;
-    padding: 0 4px;
+.stat-value {
+    font-size: 0.8rem;
     font-weight: 800;
+}
+
+/* 最大騎士力・最長交易路（2点）を持っている欄は金色 */
+.stat.award {
+    background: var(--gold);
+}
+
+.stat.award .stat-label {
+    color: var(--ink);
 }
 
 .player .points {

@@ -197,7 +197,8 @@ function createStage(view, refs) {
         if (kind === 'dev') return row.querySelector('.stat.devs') ?? row;
         if (typeof kind === 'string' && kind.startsWith('award:')) {
             const name = kind.slice('award:'.length);
-            return [...row.querySelectorAll('.award')].find(el => el.textContent === name) ?? row.querySelector('.points') ?? row;
+            // 称号は、その人の「道」「騎士」の欄（持っていると金色になる）へ
+            return row.querySelector(name === AWARD_NAMES.longestRoad ? '.stat.roads' : '.stat.knights') ?? row.querySelector('.points') ?? row;
         }
         return row.querySelector('.stat.cards') ?? row;
     };

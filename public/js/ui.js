@@ -743,14 +743,17 @@ export default class UI {
             const swatch = element('span', { className: 'swatch' });
             swatch.style.background = PLAYER_COLORS[player.id];
             const name = element('span', { className: 'name', text: player.name });
+            // 手札・発展カードの枚数、使った騎士の数、一番長い道の長さ。最大騎士力・最長交易路（2点）を持っていれば、その欄を金色にする
             const stats = element('span', { className: 'stats' });
-            const stat = (cls, value, title) => stats.append(element('span', { className: `stat ${cls}`, text: String(value), title }));
-            stat('cards', player.cardCount, '手札');
-            stat('devs', player.devCardCount, '発展カード');
-            stat('knights', player.knights, '使った騎士');
-            stat('roads', player.roadLength, '一番長い道');
-            if (view.longestRoad === player.id) stats.append(element('span', { className: 'award', text: '交易路', title: '最長交易路（2点）' }));
-            if (view.largestArmy === player.id) stats.append(element('span', { className: 'award', text: '騎士力', title: '最大騎士力（2点）' }));
+            const stat = (cls, label, value, title, award = false) => {
+                const item = element('span', { className: `stat ${cls}${award ? ' award' : ''}`, title });
+                item.append(element('span', { className: 'stat-label', text: label }), element('span', { className: 'stat-value', text: String(value) }));
+                stats.append(item);
+            };
+            stat('cards', '手札', player.cardCount, '手札の枚数');
+            stat('devs', '発展', player.devCardCount, '発展カードの枚数');
+            stat('knights', '騎士', player.knights, view.largestArmy === player.id ? '使った騎士の数（最大騎士力 2点）' : '使った騎士の数', view.largestArmy === player.id);
+            stat('roads', '道', player.roadLength, view.longestRoad === player.id ? '一番長い道の長さ（最長交易路 2点）' : '一番長い道の長さ', view.longestRoad === player.id);
             const points = element('span', { className: 'points', text: String(player.points), title: '勝利点' });
             row.append(swatch, name, stats, points);
             if (player.proxy) row.append(element('span', { className: 'badge muted', text: '代行' }));
