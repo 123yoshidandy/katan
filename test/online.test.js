@@ -211,4 +211,51 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(a.last('lobby').matchId).not.toBe(matchId);
         expect(a.last('state').view.result).toBeNull();
     });
+
+    describe('人間が複数いるときの交渉では、CPU は 2〜4 秒たってから答える', () => {
+        // 人間2人と CPU で始め、手番の人間がサイコロを振って盗賊を片付け、手番でない人間に交渉を持ちかける
+        async function offerWithCpu() {
+            const server = createTestServer(game);
+            const clients = await server.createRoom(['あき', 'はる']);
+            await clients[0].send('addCpu');
+            await clients[0].send('start');
+            await finishSetup(clients);
+            const current = currentOf(clients);
+            const other = clients.find(c => c !== current);
+            await current.send('command', { command: { type: 'roll' } });
+            for (let i = 0; i < 3 && current.last('state').view.pending?.type === 'robber'; i++) {
+                const view = current.last('state').view;
+                const hex = view.board.hexes.findIndex((_, id) => id !== view.robber);
+                await current.send('command', { command: { type: 'moveRobber', hex, victim: null } });
+                if (current.last('error')?.message === '奪う相手を選んでください') {
+                    await current.send('command', { command: { type: 'moveRobber', hex, victim: clients.indexOf(other) } });
+                }
+            }
+            const mine = current.last('state').view.players[clients.indexOf(current)].hand;
+            const give = Object.keys(mine).find(r => mine[r] > 0);
+            const get = Object.keys(mine).find(r => r !== give);
+            await current.send('command', { command: { type: 'offerTrade', give: { [give]: 1 }, get: { [get]: 1 } } });
+            const trade = other.last('state').view.trade;
+            expect(trade.responses[2]).toBeUndefined();
+            return { server, other, trade };
+        }
+
+        it('持ちかけてから時刻を過ぎて、端末から何か届くと、CPU が答える', async () => {
+            const { server, other, trade } = await offerWithCpu();
+            server.clock.now += 1999;
+            await other.send('ping', { clientTime: 0 });
+            expect(other.last('state').view.trade.responses[2]).toBeUndefined();
+            server.clock.now += 2001;
+            await other.send('ping', { clientTime: 0 });
+            const after = other.last('state').view.trade;
+            expect(after === null || after.id !== trade.id || Boolean(after.responses[2])).toBe(true);
+        });
+
+        it('ほかの人間がみな答えたら、時刻を待たずに CPU が答える', async () => {
+            const { other, trade } = await offerWithCpu();
+            await other.send('command', { command: { type: 'respondTrade', id: trade.id, accept: false } });
+            const after = other.last('state').view.trade;
+            expect(after === null || Boolean(after.responses[2])).toBe(true);
+        });
+    });
 });
