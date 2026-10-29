@@ -110,7 +110,7 @@ function nextStep(view, hint, { piece, lacking, missingCount, chips, act, mode }
         case 'bankTrade': {
             const ratio = view.options.tradeRatios[hint.give];
             const result = missingCount <= 1 ? 'に換えれば揃います' : 'に換えて、足りない分を減らします';
-            return act('余っている', { icon: hint.give }, `${ratio}枚を、銀行で`, { icon: hint.get }, result);
+            return act('余っている', { icon: hint.give }, `${ratio}枚を`, { icon: hint.get }, result);
         }
         case 'buyDevCard': return act('余った資源で、発展カードを買っておきます');
         case 'playDev':

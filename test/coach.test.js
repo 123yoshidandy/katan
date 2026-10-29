@@ -71,14 +71,14 @@ describe('作戦（状況の説明）', () => {
         else expect(action(game, seat)).toBe('出るタイルがないので、交換で手に入れます。今は手番を終えます★');
     });
 
-    it('材料が揃えば建てる。銀行と交換すれば揃うなら、交換を勧める', () => {
+    it('材料が揃えば建てる。4:1・港で換えれば揃うなら、交換を勧める', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
         game.players[seat].pieces.road = 0; // 道を使い切り、広げる先がない（都市を目指す）
         game.players[seat].hand = hand({ wheat: 2, ore: 3 });
         expect(story(game, seat)).toBe('都市にすると1点増え、資源も2倍です。材料は揃っています。《なので、都市を建てます★》');
         game.players[seat].hand = hand({ wheat: 2, ore: 2, sheep: 4 });
-        expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を、銀行で\[ore\]に換えれば揃います★$/);
+        expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を\[ore\]に換えれば揃います★$/);
     });
 
     it('交換で揃わなくても、余っている資源は足りない資源に換える', () => {
@@ -87,7 +87,7 @@ describe('作戦（状況の説明）', () => {
         game.players[seat].pieces.road = 0; // 道を使い切り、広げる先がない（都市を目指す）
         game.players[seat].hand = hand({ sheep: 5 });
         expect(createGameView(game, seat).options.suggestion.command).toMatchObject({ type: 'bankTrade', give: 'sheep' });
-        expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を、銀行で\[(ore|wheat)\]に換えて、足りない分を減らします★$/);
+        expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を\[(ore|wheat)\]に換えて、足りない分を減らします★$/);
     });
 
     it('目指すもののほかに材料が揃っている物を建てるときは、先に建てると言う（道は木材・レンガが2枚ずつあるとき）', () => {
