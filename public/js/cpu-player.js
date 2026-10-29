@@ -257,25 +257,17 @@ function chooseRoad(game, seat, { towardSpot = false } = {}) {
     return edge;
 }
 
-// cost を払うために、余っている資源を銀行と交換する手（足りない分を全部まかなえるときだけ）
+// cost に足りない資源を、余っている資源と銀行で交換する手（全部まかなえなくても、1枚ずつ近づける）
 function planBankTrade(game, seat, cost) {
     const hand = game.players[seat].hand;
-    const missing = RESOURCES.filter(r => hand[r] < (cost[r] ?? 0));
-    const missingCount = missing.reduce((sum, r) => sum + (cost[r] - hand[r]), 0);
-    let tradesAvailable = 0;
-    let giveResource = null;
-    RESOURCES.forEach(r => {
-        const spare = hand[r] - (cost[r] ?? 0);
-        const ratio = game.tradeRatio(seat, r);
-        const n = spare > 0 ? Math.floor(spare / ratio) : 0;
-        if (n > 0 && (giveResource === null || spare - ratio > hand[giveResource] - (cost[giveResource] ?? 0) - game.tradeRatio(seat, giveResource))) {
-            giveResource = r;
-        }
-        tradesAvailable += n;
-    });
-    if (missingCount === 0 || tradesAvailable < missingCount || giveResource === null) return null;
-    const get = missing.find(r => game.bank[r] > 0);
-    return get ? { give: giveResource, get } : null;
+    const lack = (r) => (cost[r] ?? 0) - hand[r];
+    const missing = RESOURCES.filter(r => lack(r) > 0 && game.bank[r] > 0);
+    if (missing.length === 0) return null;
+    // cost に使わない分が交換の比率以上ある資源のうち、交換したあとも一番多く余るもの
+    const spare = (r) => hand[r] - (cost[r] ?? 0) - game.tradeRatio(seat, r);
+    const givable = RESOURCES.filter(r => spare(r) >= 0);
+    if (givable.length === 0) return null;
+    return { give: best(givable, spare), get: best(missing, lack) };
 }
 
 function neededMost(player, cost) {

@@ -81,6 +81,15 @@ describe('作戦（状況の説明）', () => {
         expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を、銀行で\[ore\]に換えれば揃います★$/);
     });
 
+    it('交換で揃わなくても、余っている資源は足りない資源に換える', () => {
+        const game = playing(5);
+        const seat = game.currentPlayerIndex;
+        game.players[seat].pieces.road = 0; // 道を使い切り、広げる先がない（都市を目指す）
+        game.players[seat].hand = hand({ sheep: 5 });
+        expect(createGameView(game, seat).options.suggestion.command).toMatchObject({ type: 'bankTrade', give: 'sheep' });
+        expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を、銀行で\[(ore|wheat)\]に換えて、足りない分を減らします★$/);
+    });
+
     it('建てる場所を選んでいる間は、光っている場所から選ぶと言う', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;

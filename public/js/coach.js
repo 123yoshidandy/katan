@@ -84,11 +84,11 @@ export function coachStory(view, mode = null) {
     const sources = resourceSources(view, me.id);
     const chips = uniqueChips(lacking.flatMap(r => sources[r]).filter(x => !x.blocked)).map(chip => ({ chip }));
 
-    return [say(WHY[piece]), need, nextStep(view, hint, { lacking, chips, act, mode })].filter(Boolean);
+    return [say(WHY[piece]), need, nextStep(view, hint, { lacking, missingCount: countCards(missing), chips, act, mode })].filter(Boolean);
 }
 
 // 今すること（最後の文）
-function nextStep(view, hint, { lacking, chips, act, mode }) {
+function nextStep(view, hint, { lacking, missingCount, chips, act, mode }) {
     // 相手の番：待っている間に何が起きればよいか
     if (!view.isMyTurn) {
         if (lacking.length === 0) return { parts: ['次の自分の番で建てられます'], strong: true };
@@ -106,7 +106,8 @@ function nextStep(view, hint, { lacking, chips, act, mode }) {
         case 'build': return act(`なので、${PIECE_NAMES[hint.piece]}を建てます`);
         case 'bankTrade': {
             const ratio = view.options.tradeRatios[hint.give];
-            return act('余っている', { icon: hint.give }, `${ratio}枚を、銀行で`, { icon: hint.get }, 'に換えれば揃います');
+            const result = missingCount <= 1 ? 'に換えれば揃います' : 'に換えて、足りない分を減らします';
+            return act('余っている', { icon: hint.give }, `${ratio}枚を、銀行で`, { icon: hint.get }, result);
         }
         case 'buyDevCard': return act('余った資源で、発展カードを買っておきます');
         case 'playDev':
