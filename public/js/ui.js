@@ -904,6 +904,21 @@ export default class UI {
         });
     }
 
+    // ボタンの下に出す、必要な資源の図柄（アシストが ON なら、足りない資源の図柄を薄くする）
+    costLine(costs, hand) {
+        const cost = cardsLine(costs);
+        cost.classList.add('cost');
+        if (this.assist) {
+            let index = 0;
+            RESOURCES.forEach(r => {
+                for (let i = 0; i < (costs[r] ?? 0); i++, index++) {
+                    if (i >= hand[r]) cost.children[index].classList.add('lack');
+                }
+            });
+        }
+        return cost;
+    }
+
     renderActions(view) {
         const me = view.me;
         const canAct = this.canAct(view);
@@ -925,21 +940,14 @@ export default class UI {
             const button = $(`act-${piece}`);
             button.disabled = !this.canBuild(view, piece);
             button.classList.toggle('selected', this.mode === piece);
-            // アシストが ON なら、足りない資源の図柄を薄くする
-            const cost = cardsLine(COSTS[piece]);
-            cost.classList.add('cost');
-            if (this.assist) {
-                let index = 0;
-                RESOURCES.forEach(r => {
-                    for (let i = 0; i < (COSTS[piece][r] ?? 0); i++, index++) {
-                        if (i >= me.hand[r]) cost.children[index].classList.add('lack');
-                    }
-                });
-            }
-            button.replaceChildren(element('span', { className: 'label' }, [pieceIcon(piece, me.id), PIECE_NAMES[piece]]), cost);
+            button.replaceChildren(element('span', { className: 'label' }, [pieceIcon(piece, me.id), PIECE_NAMES[piece]]), this.costLine(COSTS[piece], me.hand));
         });
+        // 発展カード：買うことも使うこともできなければ暗くする
         const devButton = $('act-dev');
-        devButton.disabled = view.phase !== 'play';
+        const canBuyDev = canAct && view.rolled && view.devDeckCount > 0 && hasCards(me.hand, COSTS.devCard);
+        const canPlayDev = canAct && view.options?.playableDevCards.length > 0;
+        devButton.disabled = !(canBuyDev || canPlayDev);
+        devButton.replaceChildren(element('span', { className: 'label', text: '発展カード' }), this.costLine(COSTS.devCard, me.hand));
         devButton.dataset.count = me.devCardCount > 0 ? String(me.devCardCount) : '';
         devButton.classList.toggle('ready', view.options?.playableDevCards.length > 0);
         $('act-trade').disabled = !(canAct && view.rolled);
