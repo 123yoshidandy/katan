@@ -6,10 +6,12 @@
 
 import Game from './game.js';
 import { createGameView, hydrateGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, isAnsweringTrade } from './cpu-player.js';
 
 const CPU_STEP_DELAY_MS = 700; // CPUの手は1手ずつ間を置いて見せる
 const REALTIME_CPU_STEP_DELAY_MS = 350; // リアルタイムモードでは、CPU が並んで動くので間を短くする
+const TRADE_REPLY_MIN_MS = 2000;        // 交渉の返事は、持ちかけられてから 2〜4 秒考えてから返す（すぐ返すと落ち着かない）
+const TRADE_REPLY_MAX_MS = 4000;
 
 export default class LocalGameController {
     // players: [{ name, isCPU }] / listeners: onUpdate() / onError(message) / options: { mode }
@@ -18,6 +20,7 @@ export default class LocalGameController {
         this.game = new Game(players, { mode });
         this.cpuTimer = null;
         this.lastHumanId = null;
+        this.replies = null; // 交渉ごとの、CPU が返事をする時刻 { id, at: { 席: 時刻 } }
         this.scheduleCpu();
     }
 
@@ -55,11 +58,28 @@ export default class LocalGameController {
     scheduleCpu() {
         clearTimeout(this.cpuTimer);
         if (!isCpuTurn(this.game)) return;
+        const step = this.game.isRealtimePlay() ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS;
+        // 返事を考えている CPU は飛ばし、動ける CPU がいなければ、一番早い返事の時刻まで待つ
+        const readyAt = (time) => (seat) => this.replyTime(seat) <= time;
+        const waiting = this.game.players.map(p => this.replyTime(p.id)).filter(time => time > 0);
+        const delay = isCpuTurn(this.game, readyAt(Date.now() + step)) ? step
+            : Math.max(step, Math.min(...waiting) - Date.now());
         this.cpuTimer = setTimeout(() => {
-            runCpuStep(this.game);
-            this.listeners.onUpdate?.();
+            if (runCpuStep(this.game, readyAt(Date.now()))) this.listeners.onUpdate?.();
             this.scheduleCpu();
-        }, this.game.isRealtimePlay() ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS);
+        }, delay);
+    }
+
+    // seat の CPU が動いてよい時刻（交渉にまだ答えていなければ、返事をする時刻）
+    replyTime(seat) {
+        const { trade } = this.game;
+        if (!isAnsweringTrade(this.game, seat)) return 0;
+        if (this.replies?.id !== trade.id) {
+            const at = {};
+            this.game.players.forEach(p => { at[p.id] = Date.now() + TRADE_REPLY_MIN_MS + Math.random() * (TRADE_REPLY_MAX_MS - TRADE_REPLY_MIN_MS); });
+            this.replies = { id: trade.id, at };
+        }
+        return this.replies.at[seat];
     }
 
     stop() {
