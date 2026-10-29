@@ -1217,6 +1217,25 @@ dialog::backdrop {
     width: min(560px, calc(100vw - 16px));
 }
 
+/* 遊び方のタブ（幅いっぱいに5つ並べる） */
+.help-tabs {
+    display: flex;
+    width: 100%;
+    margin-bottom: 6px;
+    /* 長いページをスクロールしても、タブは上に残す */
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    /* 上の余白からのぞく本文を、地の色で隠す */
+    box-shadow: 0 -16px 0 4px var(--panel);
+}
+
+.help-tabs button {
+    flex: 1 1 auto;
+    padding: 5px 4px;
+    font-size: 0.82rem;
+}
+
 .help-body section {
     margin-bottom: 10px;
 }
@@ -1306,6 +1325,13 @@ dialog::backdrop {
     .title-side {
         flex: none;
         width: min(360px, 100%);
+    }
+}
+
+/* 低い縦画面では、タイトルの絵を小さくしてパネルを収める */
+@media (orientation: portrait) and (max-height: 600px) {
+    .title-art {
+        width: min(80vw, 24dvh);
     }
 }
 

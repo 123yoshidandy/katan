@@ -210,6 +210,16 @@ export default class UI {
 
         $('open-help').addEventListener('click', () => this.openDialog('help-dialog'));
         $('help-button').addEventListener('click', () => this.openDialog('help-dialog'));
+        // 遊び方はタブで切り替える（前に見ていたタブを開く）
+        const showHelpTab = (tab) => {
+            document.querySelectorAll('#help-dialog [data-help-tab]').forEach(b => b.classList.toggle('selected', b.dataset.helpTab === tab));
+            document.querySelectorAll('#help-dialog [data-help-page]').forEach(p => p.classList.toggle('hidden', p.dataset.helpPage !== tab));
+            $('help-dialog').scrollTop = 0;
+        };
+        document.querySelectorAll('#help-dialog [data-help-tab]').forEach(button => {
+            button.addEventListener('click', () => showHelpTab(button.dataset.helpTab));
+        });
+        showHelpTab('basic');
         $('menu-button').addEventListener('click', () => this.goHome());
         document.querySelectorAll('.sound-toggle').forEach(button => button.addEventListener('click', () => toggleSound()));
         onSoundChange(() => {
