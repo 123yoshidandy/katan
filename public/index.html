@@ -266,6 +266,7 @@
         </div>
         <div class="segmented help-tabs" role="tablist">
             <button type="button" role="tab" data-help-tab="basic">基本</button>
+            <button type="button" role="tab" data-help-tab="points">得点</button>
             <button type="button" role="tab" data-help-tab="build">建設・交換</button>
             <button type="button" role="tab" data-help-tab="robber">盗賊・発展</button>
             <button type="button" role="tab" data-help-tab="screen">画面</button>
@@ -276,7 +277,7 @@
                 <section>
                     <h3>🎯 目的</h3>
                     <p>島に開拓地や都市を建てて、<strong>自分の手番に10点</strong>に達した人の勝ちです。</p>
-                    <p><i data-pic="piece:settlement"></i>開拓地1点・<i data-pic="piece:city"></i>都市2点・勝利点カード1点、最長交易路と最大騎士力はそれぞれ2点です。</p>
+                    <p>何をすると点になるかは、「得点」のタブにまとめています。</p>
                 </section>
                 <section>
                     <h3>🏝️ 島と資源</h3>
@@ -301,6 +302,28 @@
                     </ol>
                 </section>
             </div>
+            <div class="help-page" data-help-page="points">
+                <section>
+                    <h3>🏆 点になるもの</h3>
+                    <p>自分の手番に<strong>10点</strong>に達したら勝ちです。</p>
+                    <ul>
+                        <li><i data-pic="piece:settlement"></i><strong>開拓地</strong>：1つ1点</li>
+                        <li><i data-pic="piece:city"></i><strong>都市</strong>：1つ2点（開拓地を都市にすると、1点増える）</li>
+                        <li><i data-pic="dev:victoryPoint"></i><strong>勝利点カード</strong>：1枚1点（発展カードから出る。ほかの人には見えない）</li>
+                        <li><i data-pic="piece:road"></i><strong>最長交易路</strong>：2点（一番長い道を持つ人。ボーナス）</li>
+                        <li><i data-pic="dev:knight"></i><strong>最大騎士力</strong>：2点（騎士を一番多く使った人。ボーナス）</li>
+                    </ul>
+                </section>
+                <section>
+                    <h3>🛣️ 最長交易路</h3>
+                    <p>5本以上つながった道を最初に作った人が、ボーナスの2点を得ます。もっと長い道を作った人に移ります。ほかの人の開拓地があると、道はそこで途切れます。</p>
+                    <div data-pic="longest"></div>
+                </section>
+                <section>
+                    <h3>⚔️ 最大騎士力</h3>
+                    <p>騎士のカードを3枚以上使った人のうち、最初に3枚使った人が、ボーナスの2点を得ます。ほかの人がもっと多く使うと、その人に移ります。使った騎士の数は、プレイヤーの欄の「騎士」でわかります。</p>
+                </section>
+            </div>
             <div class="help-page" data-help-page="build">
                 <section>
                     <h3>🔨 建設に必要な資源</h3>
@@ -317,11 +340,6 @@
                     <p>銀行とは同じ資源4枚で好きな資源1枚と交換できます。港に建物があれば 3:1、資源の描かれた港なら その資源 2:1 で交換できます。</p>
                     <div data-pic="trade"></div>
                     <p>手番の人は、ほかの人に交換を持ちかけられます。誰かが受けた時点で、その人との交換が成立します（早い者勝ち）。</p>
-                </section>
-                <section>
-                    <h3>🛣️ 最長交易路</h3>
-                    <p>5本以上つながった道を最初に作った人が2点を得ます。もっと長い道を作った人に移ります。ほかの人の開拓地があると、道はそこで途切れます。</p>
-                    <div data-pic="longest"></div>
                 </section>
             </div>
             <div class="help-page" data-help-page="robber">
