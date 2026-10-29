@@ -227,12 +227,10 @@ function buildTarget(game, seat) {
 }
 
 // 目標のほかに建てる物 { piece, at }
-// 開拓地・都市は、建てられるなら建てる。道は、道ばかりにならないよう、木材とレンガが2枚ずつあり、目標の材料を減らさないときだけ
+// 開拓地・都市は、建てられるなら建てる
+// 道は、木材とレンガが2枚以上ずつあるときだけ（1枚ずつ残り、開拓地の材料を揃えられる。道ばかりにもならない）
 function extraBuild(game, seat, target) {
     const player = game.players[seat];
-    const keep = target ? COSTS[target.piece] : {};
-    // 道に使う資源は、使ったあとも目標に要る枚数が残ること（開拓地・都市は点になるので、目標の材料を使ってでも建てる）
-    const affordable = (piece) => RESOURCES.every(r => !COSTS[piece][r] || player.hand[r] - COSTS[piece][r] >= (keep[r] ?? 0));
     if (target?.piece !== 'city' && player.pieces.city > 0 && hasCards(player.hand, COSTS.city)) {
         const cities = game.citySpots(seat);
         if (cities.length) return { piece: 'city', at: best(cities, v => vertexValue(game, v, null)) };
@@ -241,7 +239,7 @@ function extraBuild(game, seat, target) {
         const spots = game.settlementSpots(seat);
         if (spots.length) return { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player)) };
     }
-    if (target?.piece !== 'road' && player.pieces.road > 0 && player.hand.wood >= 2 && player.hand.brick >= 2 && affordable('road')) {
+    if (target?.piece !== 'road' && player.pieces.road > 0 && player.hand.wood >= 2 && player.hand.brick >= 2) {
         const at = chooseRoad(game, seat);
         if (at !== null && at !== undefined) return { piece: 'road', at };
     }
