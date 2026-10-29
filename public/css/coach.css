@@ -41,7 +41,7 @@
     text-shadow: 0 0 2px #6b4a00, 0 0 2px #6b4a00;
 }
 
-/* 数字の札：盤面の札と同じ、クリーム色の丸に数字（6 と 8 は赤） */
+/* 数字の札：盤面の札と同じ、クリーム色の丸に数字*/
 .coach-num {
     position: relative;
     display: inline-flex;
@@ -57,10 +57,6 @@
     font-size: 0.64rem;
     font-weight: 800;
     line-height: 1;
-}
-
-.coach-num.red {
-    color: #c0392b;
 }
 
 /* 盗賊がいるタイルの数字は、斜線で消す */

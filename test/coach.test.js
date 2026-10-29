@@ -50,7 +50,7 @@ describe('作戦（状況の説明）', () => {
         const game = new Game(humans(3), { seed: 2 });
         const seat = game.currentPlayerIndex;
         const other = (seat + 1) % 3;
-        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。《7に近い数字（6・8は赤）の近くに置くと、よく集まります★》');
+        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。《7に近い数字（大きく描いた数字）の近くに置くと、よく集まります★》');
         expect(story(game, other)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。7に近い数字の近くが狙い目です。');
         game.applyCommand(seat, createGameView(game, seat).options.suggestion.command);
         expect(story(game, seat)).toBe('開拓地は、道の先にしか建てられません。《次に開拓地を置きたい方へ、道を伸ばします★》');
