@@ -276,16 +276,21 @@
                 <section>
                     <h3>🎯 目的</h3>
                     <p>島に開拓地や都市を建てて、<strong>自分の手番に10点</strong>に達した人の勝ちです。</p>
-                    <p>開拓地1点・都市2点・勝利点カード1点、最長交易路と最大騎士力はそれぞれ2点です。</p>
+                    <p><i data-pic="piece:settlement"></i>開拓地1点・<i data-pic="piece:city"></i>都市2点・勝利点カード1点、最長交易路と最大騎士力はそれぞれ2点です。</p>
                 </section>
                 <section>
                     <h3>🏝️ 島と資源</h3>
-                    <p class="terrains"><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-wood"/></svg>森＝木材</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-brick"/></svg>丘陵＝レンガ</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-sheep"/></svg>牧草地＝羊毛</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-wheat"/></svg>畑＝小麦</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-ore"/></svg>山地＝鉄</span><span><svg class="mini-icon" viewBox="0 0 40 40" aria-hidden="true"><use href="#sym-desert"/></svg>砂漠からは何も出ません</span></p>
-                    <p>サイコロの目と同じ数字のタイルに接する<strong>開拓地は1枚、都市は2枚</strong>の資源をもらえます。7に近い数字ほど出やすく、数字も大きく描いてあります（6と8は赤）。</p>
+                    <p>島は、資源が出るタイルでできています。</p>
+                    <div data-pic="resources"></div>
+                    <p>サイコロの目と同じ数字のタイルの角にある<strong>開拓地は1枚、都市は2枚</strong>の資源をもらえます。</p>
+                    <div data-pic="production"></div>
+                    <p>7に近い数字ほど出やすく、数字も大きく描いてあります。</p>
+                    <div data-pic="odds"></div>
                 </section>
                 <section>
                     <h3>🏠 初期配置</h3>
                     <p>順番に開拓地と道を1つずつ置き、折り返して逆の順にもう1組置きます。2つ目の開拓地の周りの資源をもらって始まります。</p>
+                    <div data-pic="setup"></div>
                 </section>
                 <section>
                     <h3>🔁 手番の流れ</h3>
@@ -300,35 +305,38 @@
                 <section>
                     <h3>🔨 建設に必要な資源</h3>
                     <ul class="costs">
-                        <li><strong>道</strong>：木材・レンガ（自分の道か建物につなげる）</li>
-                        <li><strong>開拓地</strong>：木材・レンガ・羊毛・小麦（自分の道につながる場所。ほかの建物の隣には置けない）</li>
-                        <li><strong>都市</strong>：小麦2・鉄3（自分の開拓地を都市にする）</li>
-                        <li><strong>発展カード</strong>：羊毛・小麦・鉄</li>
+                        <li><i data-pic="piece:road"></i><strong>道</strong>：<i data-pic="cost:road"></i><br>自分の道か建物につなげる</li>
+                        <li><i data-pic="piece:settlement"></i><strong>開拓地</strong>：<i data-pic="cost:settlement"></i><br>自分の道につながる場所。ほかの建物の隣には置けない</li>
+                        <li><i data-pic="piece:city"></i><strong>都市</strong>：<i data-pic="cost:city"></i><br>自分の開拓地を都市にする</li>
+                        <li><strong>発展カード</strong>：<i data-pic="cost:devCard"></i></li>
                     </ul>
                 </section>
                 <section>
                     <h3>🤝 交換</h3>
                     <p>銀行とは同じ資源4枚で好きな資源1枚と交換できます。港に建物があれば 3:1、資源の描かれた港なら その資源 2:1 で交換できます。</p>
+                    <div data-pic="trade"></div>
                     <p>手番の人は、ほかの人に交換を持ちかけられます。誰かが受けた時点で、その人との交換が成立します（早い者勝ち）。</p>
                 </section>
                 <section>
                     <h3>🛣️ 最長交易路</h3>
                     <p>5本以上つながった道を最初に作った人が2点を得ます。もっと長い道を作った人に移ります。ほかの人の開拓地があると、道はそこで途切れます。</p>
+                    <div data-pic="longest"></div>
                 </section>
             </div>
             <div class="help-page" data-help-page="robber">
                 <section>
                     <h3>🦹 7 と盗賊</h3>
                     <p>7 が出たら、手札が8枚以上の人は半分（切り捨て）を捨てます。サイコロを振った人は盗賊を別のタイルに動かし、そのタイルに建物を持つ人から1枚奪います。盗賊のいるタイルからは資源が出ません。</p>
+                    <div data-pic="robber"></div>
                 </section>
                 <section>
                     <h3>🃏 発展カード</h3>
                     <ul>
-                        <li><strong>騎士</strong>：盗賊を動かして1枚奪う。3枚以上使って一番多い人が<strong>最大騎士力</strong>（2点）</li>
-                        <li><strong>街道建設</strong>：道を2本無料で置く</li>
-                        <li><strong>収穫</strong>：好きな資源を2枚もらう</li>
-                        <li><strong>独占</strong>：資源を1種類選び、ほかの全員からその資源を全部もらう</li>
-                        <li><strong>勝利点</strong>：持っているだけで1点（ほかの人には見えません）</li>
+                        <li><i data-pic="dev:knight"></i><strong>騎士</strong>：盗賊を動かして1枚奪う。3枚以上使って一番多い人が<strong>最大騎士力</strong>（2点）</li>
+                        <li><i data-pic="dev:roadBuilding"></i><strong>街道建設</strong>：道を2本無料で置く</li>
+                        <li><i data-pic="dev:yearOfPlenty"></i><strong>収穫</strong>：好きな資源を2枚もらう</li>
+                        <li><i data-pic="dev:monopoly"></i><strong>独占</strong>：資源を1種類選び、ほかの全員からその資源を全部もらう</li>
+                        <li><i data-pic="dev:victoryPoint"></i><strong>勝利点</strong>：持っているだけで1点（ほかの人には見えません）</li>
                     </ul>
                     <p>買った手番には使えません。騎士などはサイコロを振る前にも使えます。</p>
                 </section>
@@ -337,7 +345,7 @@
                 <section>
                     <h3>👥 プレイヤーの欄</h3>
                     <p>相手の欄は画面の奥（縦画面では盤面の上、横画面では右の列の上）に横に並び、自分の欄は手札の上に出ます。相手の欄は、上の縁がその人の色です。</p>
-                    <p>名前の右（相手の欄では名前の下）に、<strong>手札</strong>（資源カードの枚数）・<strong>発展</strong>（発展カードの枚数）・<strong>騎士</strong>（使った騎士の数）を出し、右端が<strong>得点</strong>です。最大騎士力（2点）を持っている人は騎士の欄が金色に、最長交易路（2点）を持っている人には金色の<strong>道</strong>が出ます。狭い画面では、項目名を「札・発・騎」と1文字で出します。</p>
+                    <p>名前の右（相手の欄では名前の下）に、<strong>手札</strong>（資源カードの枚数）・<strong>発展</strong>（発展カードの枚数）・<strong>騎士</strong>（使った騎士の数）・<strong>道</strong>（一番長い道の長さ）を出し、右端が<strong>得点</strong>です。最大騎士力・最長交易路（それぞれ2点）を持っている人は、その欄が金色になります。狭い画面では、項目名を「札・発・騎・道」と1文字で出します。</p>
                 </section>
                 <section>
                     <h3>💡 アシスト</h3>

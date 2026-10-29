@@ -537,10 +537,6 @@ input {
     fill: var(--ink);
 }
 
-.token.red text {
-    fill: #c62d1f;
-}
-
 .harbor .pier {
     stroke: #8a6a3f;
     stroke-width: 4;
@@ -710,14 +706,6 @@ input {
     min-width: 0;
 }
 
-/* 札の名前の行の、最長交易路の「道」 */
-.tile-head .stat.roads {
-    flex: none;
-    font-size: 0.66rem;
-    font-weight: 800;
-    padding: 0 3px;
-}
-
 /* 札の中の手札・発展・騎士・道は1行。狭い札では文字を小さくし、さらに狭ければ項目名を1文字にする */
 /* 自分の欄と同じく、右に寄せる */
 .player.tile .stats {
@@ -726,7 +714,7 @@ input {
     gap: 5px;
 }
 
-@container (max-width: 104px) {
+@container (max-width: 140px) {
     .player.tile .stats {
         gap: 2px;
     }
@@ -748,7 +736,7 @@ input {
     display: none;
 }
 
-@container (max-width: 104px) {
+@container (max-width: 140px) {
     .player.tile .stat-label .full {
         display: none;
     }
@@ -1217,17 +1205,25 @@ dialog::backdrop {
     width: min(560px, calc(100vw - 16px));
 }
 
+/* 見出しとタブは動かさず、本文だけをスクロールする */
+.help[open] {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.help-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 /* 遊び方のタブ（幅いっぱいに5つ並べる） */
 .help-tabs {
     display: flex;
     width: 100%;
+    flex: none;
     margin-bottom: 6px;
-    /* 長いページをスクロールしても、タブは上に残す */
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    /* 上の余白からのぞく本文を、地の色で隠す */
-    box-shadow: 0 -16px 0 4px var(--panel);
 }
 
 .help-tabs button {
@@ -1251,21 +1247,144 @@ dialog::backdrop {
     margin: 2px 0;
 }
 
-.help-body .terrains {
+/* ===== 遊び方の図（help-pictures.js） ===== */
+
+/* 文中の図柄 */
+.help-body [data-pic] {
+    font-style: normal;
+}
+
+.help-body .mini-icon {
+    width: 18px;
+    height: 18px;
+    vertical-align: -4px;
+}
+
+.help-body .piece-icon {
+    width: 18px;
+    height: 16px;
+    margin-right: 2px;
+    vertical-align: -3px;
+}
+
+.pic-scene {
+    display: block;
+    width: 120px;
+    height: auto;
+    flex: none;
+}
+
+.pic-scene.pic-mid {
+    width: 220px;
+    max-width: 100%;
+    margin: 4px auto;
+}
+
+.pic-scene.pic-wide {
+    width: 100%;
+    max-width: 380px;
+}
+
+.pic-label {
+    font-size: 15px;
+    font-weight: 800;
+    fill: var(--ink);
+    paint-order: stroke;
+    stroke: var(--panel);
+    stroke-width: 4px;
+}
+
+.pic-block {
+    stroke: #b3261e;
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.pic-tiles {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 12px;
+    gap: 4px 6px;
+    margin: 6px 0;
 }
 
-.help-body .terrains span {
-    display: inline-flex;
+.pic-tiles figure {
+    margin: 0;
+    width: 46px;
+    text-align: center;
+    font-size: 0.78rem;
+}
+
+.pic-tiles .pic-scene {
+    width: 46px;
+    margin: 0 auto 2px;
+}
+
+.pic-row {
+    display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 14px;
+    margin: 6px 0;
 }
 
-.help-body .terrains .mini-icon {
-    width: 20px;
-    height: 20px;
+.pic-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0;
+    font-size: 0.9rem;
+}
+
+.pic-caption > div {
+    line-height: 1.9;
+}
+
+.pic-arrow {
+    margin: 0 4px;
+    color: var(--muted);
+}
+
+.pic-pair {
+    display: inline-flex;
+    margin-right: 4px;
+}
+
+.pic-tag {
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: #e8dcbc;
+    margin-right: 4px;
+}
+
+.pic-badge {
+    width: 30px;
+    height: 30px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.pic-robber {
+    width: 16px;
+    height: 19px;
+    vertical-align: -4px;
+}
+
+.pic-star {
+    color: var(--gold);
+    margin-right: 2px;
+}
+
+.pic-odds {
+    margin: 6px 0;
+    max-width: 380px;
+}
+
+.pic-odds-note {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--muted);
 }
 
 .help-body ol, .help-body ul {

@@ -76,7 +76,7 @@ export function resourceIcon(resource, className = 'res-icon') {
 
 // ===== 盤面 =====
 
-const hexPoints = (cx, cy, size) => Array.from({ length: 6 }, (_, i) => {
+export const hexPoints = (cx, cy, size) => Array.from({ length: 6 }, (_, i) => {
     const angle = Math.PI / 180 * (60 * i - 90);
     return `${(cx + size * Math.cos(angle)).toFixed(1)},${(cy + size * Math.sin(angle)).toFixed(1)}`;
 }).join(' ');
@@ -184,12 +184,11 @@ const starPoints = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => {
 export const vertexPips = (board, vertexId) => GEOMETRY.vertices[vertexId].hexes
     .reduce((sum, hexId) => sum + pips(board.hexes[hexId].number), 0);
 
-// 数字の札。出やすい数字ほど大きく描く（2・12 が一番小さく、6・8 が一番大きい。6・8 は赤）
+// 数字の札。出やすい数字ほど大きく描く（2・12 が一番小さく、6・8 が一番大きい）
 const TOKEN_FONT_SIZES = [0, 13, 15, 18, 21, 24]; // 出やすさ（36回に出る回数）ごとの文字の大きさ
 
-function numberToken(x, y, number, rolled = false) {
-    const red = number === 6 || number === 8;
-    const group = svg('g', { class: `token${red ? ' red' : ''}${rolled ? ' rolled' : ''}` });
+export function numberToken(x, y, number, rolled = false) {
+    const group = svg('g', { class: `token${rolled ? ' rolled' : ''}` });
     group.append(svg('circle', { cx: x, cy: y, r: 19 }));
     const text = svg('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': TOKEN_FONT_SIZES[pips(number)] });
     text.textContent = String(number);
@@ -225,7 +224,7 @@ function renderHarbor({ edge: edgeId, type }) {
     return group;
 }
 
-function robberPiece(x, y) {
+export function robberPiece(x, y) {
     return svg('g', { class: 'robber', transform: `translate(${x} ${y})` }, [
         svg('ellipse', { cx: 0, cy: 14, rx: 11, ry: 3.5, class: 'robber-shadow' }),
         svg('path', { d: 'M-9 14 C -9 2, -6 -2, -4 -4 A 7 7 0 1 1 4 -4 C 6 -2, 9 2, 9 14 Z' })
@@ -247,13 +246,16 @@ function roadPiece(edgeId, owner, recent) {
     ]);
 }
 
+// 建物の形（頂点を原点に置く）
+export const BUILDING_PATHS = {
+    settlement: 'M-9 9 V-2 L0 -11 L9 -2 V9 Z',
+    city: 'M-14 10 V-4 L-7 -11 L0 -4 V-2 H14 V10 Z'
+};
+
 function buildingPiece(vertexId, { owner, type }, recent) {
     const { x, y } = at(GEOMETRY.vertices[vertexId]);
-    const d = type === 'city'
-        ? 'M-14 10 V-4 L-7 -11 L0 -4 V-2 H14 V10 Z'
-        : 'M-9 9 V-2 L0 -11 L9 -2 V9 Z';
     return svg('path', {
-        class: `building ${type}${recent ? ' recent' : ''}`, d, transform: `translate(${x} ${y})`,
+        class: `building ${type}${recent ? ' recent' : ''}`, d: BUILDING_PATHS[type], transform: `translate(${x} ${y})`,
         fill: PLAYER_COLORS[owner], 'data-vertex': vertexId
     });
 }
@@ -267,7 +269,7 @@ export function pieceIcon(piece, owner, className = 'piece-icon') {
     } else {
         root.append(svg('path', {
             class: `building ${piece}`, fill: PLAYER_COLORS[owner],
-            d: piece === 'city' ? 'M-14 10 V-4 L-7 -11 L0 -4 V-2 H14 V10 Z' : 'M-9 9 V-2 L0 -11 L9 -2 V9 Z'
+            d: BUILDING_PATHS[piece]
         }));
     }
     return root;

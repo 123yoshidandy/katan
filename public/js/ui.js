@@ -15,6 +15,7 @@ import { runCpuStep } from './cpu-player.js';
 import { unlockSound, playEffect, toggleSound, isSoundOn, onSoundChange } from './sound.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 import { renderCoach } from './coach.js';
+import { renderHelpPictures } from './help-pictures.js';
 import { playAnimations } from './animator.js';
 
 const SETUP_KEY = 'katan.setup'; // 開始画面で選んだ人数・名前・CPU
@@ -116,6 +117,7 @@ export default class UI {
         this.autoReject = loadSwitch(AUTO_REJECT_KEY);
         this.autoRejectedTrade = null; // 自動で断った交渉の番号（同じ交渉に何度も送らない）
         injectSymbols();
+        renderHelpPictures($('help-dialog'));
         this.bindEvents();
         this.renderTitleArt();
         this.renderSoundButtons();
@@ -214,7 +216,7 @@ export default class UI {
         const showHelpTab = (tab) => {
             document.querySelectorAll('#help-dialog [data-help-tab]').forEach(b => b.classList.toggle('selected', b.dataset.helpTab === tab));
             document.querySelectorAll('#help-dialog [data-help-page]').forEach(p => p.classList.toggle('hidden', p.dataset.helpPage !== tab));
-            $('help-dialog').scrollTop = 0;
+            document.querySelector('#help-dialog .help-body').scrollTop = 0;
         };
         document.querySelectorAll('#help-dialog [data-help-tab]').forEach(button => {
             button.addEventListener('click', () => showHelpTab(button.dataset.helpTab));
@@ -806,8 +808,8 @@ export default class UI {
         const swatch = element('span', { className: 'swatch' });
         swatch.style.background = PLAYER_COLORS[player.id];
         const name = element('span', { className: 'name', text: player.name });
-        // 手札・発展カードの枚数、使った騎士の数。最大騎士力（2点）を持っていれば騎士の欄を金色にする
-        // 道の長さは盤面でわかるので出さず、最長交易路（2点）を持っている人にだけ金色の「道」を出す
+        // 手札・発展カードの枚数、使った騎士の数、一番長い道の長さ
+        // 最大騎士力・最長交易路（それぞれ2点）を持っていれば、その欄を金色にする
         const stats = element('span', { className: 'stats' });
         // 項目名は、狭い札では1文字（短い名前）にする（CSS で切り替える）
         const SHORT = { cards: '札', devs: '発', knights: '騎', roads: '道' };
@@ -820,14 +822,12 @@ export default class UI {
         stat('cards', '手札', player.cardCount, '手札の枚数');
         stat('devs', '発展', player.devCardCount, '発展カードの枚数');
         stat('knights', '騎士', player.knights, view.largestArmy === player.id ? '使った騎士の数（最大騎士力 2点）' : '使った騎士の数', view.largestArmy === player.id);
-        // 相手の札では、名前の行（点数の左）に出す
-        if (view.longestRoad === player.id && !tile) stat('roads', '道', player.roadLength, '一番長い道の長さ（最長交易路 2点）', true);
+        stat('roads', '道', player.roadLength, view.longestRoad === player.id ? '一番長い道の長さ（最長交易路 2点）' : '一番長い道の長さ', view.longestRoad === player.id);
         const points = element('span', { className: 'points', text: String(player.points), title: '勝利点' });
         if (tile) {
             // 札では色の印の代わりに、上の縁をその人の色にする（狭い札でも名前の幅を取れるように）
             row.style.setProperty('--player-color', PLAYER_COLORS[player.id]);
             const head = element('div', { className: 'tile-head' }, [name]);
-            if (view.longestRoad === player.id) head.append(element('span', { className: 'stat roads award', text: '道', title: `最長交易路 2点（道の長さ ${player.roadLength}）` }));
             head.append(points);
             if (player.proxy) head.append(element('span', { className: 'badge muted', text: '代行' }));
             row.append(head, stats);
