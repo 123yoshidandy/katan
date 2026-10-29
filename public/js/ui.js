@@ -620,9 +620,11 @@ export default class UI {
         this.renderBoardArea(view);
         this.renderPlayers(view);
         // アシストが ON の間は、作戦の欄（目標 → 必要 → だから）が案内を兼ねる
-        const coached = renderCoach($('coach'), view, { assist: this.assist, mode: this.mode });
-        $('guide').classList.toggle('hidden', coached);
-        if (!coached) this.renderGuide(view);
+        // 交換の欄が出ている間は、作戦の欄も案内も隠し、その場所を交換の欄に譲る（下のボタンが押し出されないように）
+        const trading = Boolean(view.trade);
+        const coached = renderCoach($('coach'), view, { assist: this.assist && !trading, mode: this.mode });
+        $('guide').classList.toggle('hidden', coached || trading);
+        if (!coached && !trading) this.renderGuide(view);
         this.renderTradeStatus(view);
         this.renderHand(view);
         this.renderActions(view);
@@ -906,8 +908,11 @@ export default class UI {
         if (!trade) return;
         box.replaceChildren();
         const from = view.players[trade.from];
+        // 見ている人から見て「出す・渡す」と「もらう」を書く（自分がもらう側は緑）
+        const deal = (label, cards, mine) => element('span', { className: `deal ${mine ? 'receive' : 'pay'}` }, [element('span', { className: 'deal-label', text: label }), cardsLine(cards)]);
         const offer = element('div', { className: 'offer' });
-        offer.append(element('span', { className: 'who', text: from === view.me ? 'あなた' : from.name }), cardsLine(trade.give), element('span', { className: 'arrow', text: '⇄' }), cardsLine(trade.get));
+        if (from === view.me) offer.append(element('span', { className: 'who', text: 'あなた' }), deal('出す', trade.give, false), deal('もらう', trade.get, true));
+        else offer.append(element('span', { className: 'who', text: `${from.name}から` }), deal('もらう', trade.give, true), deal('渡す', trade.get, false));
         box.append(offer);
 
         if (from === view.me) {

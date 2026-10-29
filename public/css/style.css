@@ -875,6 +875,28 @@ input {
     font-weight: 800;
 }
 
+/* 出す・もらう資源（見ている人がもらう側は緑、出す側は赤茶） */
+.trade-status .deal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
+.trade-status .deal.receive {
+    background: #dcefc9;
+}
+
+.trade-status .deal.pay {
+    background: #f3dccf;
+}
+
+.trade-status .deal-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
 .trade-status .replies {
     display: flex;
     flex-wrap: wrap;
