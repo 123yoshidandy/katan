@@ -116,9 +116,9 @@ const SCENES = {
         return el('div', 'pic-setup', [round([0, 1, 2], '1つ目'), arrow(), round([2, 1, 0], '2つ目（逆の順）')]);
     },
 
-    // 銀行・港との交換
+    // 4:1・港での交換
     trade: () => caption([
-        [el('span', 'pic-tag', ['銀行']), ...resources('sheep', 4), arrow(), res('ore')],
+        [el('span', 'pic-tag', ['いつでも']), ...resources('sheep', 4), arrow(), res('ore')],
         [harborBadge('any'), ...resources('sheep', 3), arrow(), res('ore')],
         [harborBadge('sheep'), ...resources('sheep', 2), arrow(), res('ore')]
     ]),
