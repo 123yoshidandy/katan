@@ -420,7 +420,7 @@ export default class Game {
             const receivers = demand[r].filter(n => n > 0).length;
             // 銀行に足りないときは、もらうのが1人なら残りだけ、2人以上なら誰ももらえない
             if (total > this.bank[r] && receivers > 1) {
-                this.log(`銀行の${RESOURCE_NAMES[r]}が足りないので、誰ももらえません`);
+                this.log(`${RESOURCE_NAMES[r]}の残りが足りないので、誰ももらえません`);
                 return;
             }
             demand[r].forEach((n, id) => { gains[id][r] = Math.min(n, this.bank[r]); });
@@ -550,7 +550,7 @@ export default class Game {
             }
             const cards = emptyCards();
             resources.forEach(r => { cards[r]++; });
-            if (!hasCards(this.bank, cards)) return this.reject('銀行にその資源が足りません');
+            if (!hasCards(this.bank, cards)) return this.reject('その資源の残りが足りません');
             this.emit('playDev', { player: player.id, card });
             this.pay(player, cards, -1);
             this.emit('gain', { player: player.id, cards });
@@ -608,13 +608,13 @@ export default class Game {
         if (!RESOURCES.includes(give) || !RESOURCES.includes(get) || give === get) return this.reject('交換する資源を選んでください');
         const ratio = this.tradeRatio(player.id, give);
         if (player.hand[give] < ratio) return this.reject(`${RESOURCE_NAMES[give]}が${ratio}枚必要です`);
-        if (this.bank[get] === 0) return this.reject(`銀行に${RESOURCE_NAMES[get]}がありません`);
+        if (this.bank[get] === 0) return this.reject(`${RESOURCE_NAMES[get]}の残りがありません`);
         player.hand[give] -= ratio;
         this.bank[give] += ratio;
         player.hand[get]++;
         this.bank[get]--;
         this.emit('bankTrade', { player: player.id, give, count: ratio, get });
-        this.log(`${player.name}が銀行と交換しました（${RESOURCE_NAMES[give]}${ratio} → ${RESOURCE_NAMES[get]}1）`);
+        this.log(`${player.name}が${RESOURCE_NAMES[give]}${ratio}枚を${RESOURCE_NAMES[get]}1枚に換えました`);
         return true;
     }
 

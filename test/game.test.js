@@ -255,7 +255,7 @@ describe('発展カード', () => {
 });
 
 describe('交換', () => {
-    it('銀行とは 4:1、3:1 の港があれば 3:1、資源の港があれば 2:1', () => {
+    it('いつでも 4:1、3:1 の港があれば 3:1、資源の港があれば 2:1', () => {
         const game = afterSetup(2);
         const id = rolled(game);
         const player = game.players[id];
