@@ -835,7 +835,7 @@ export default class Game {
         this.queues = this.players.map(() => []);
         this.rolls = this.players.map(() => [1 + Math.floor(this.random() * 6), 1 + Math.floor(this.random() * 6)]);
         this.dice = null;
-        this.log(`出た目 ${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}`);
+        this.log(`サイコロを振りました。${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}`);
         this.players.forEach(p => this.emit('roll', { player: p.id, dice: [...this.rolls[p.id]] }));
         const sevens = this.players.filter(p => this.rolls[p.id][0] + this.rolls[p.id][1] === 7);
         // 7 があれば、生産の前に手札を半分捨てる（何人が7を出しても1回）
