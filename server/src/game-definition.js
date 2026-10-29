@@ -5,7 +5,7 @@
  * 各プレイヤーには、そのプレイヤーから見える状態（ビュー）だけを送る（他人の手札と発展カードは枚数だけ）
  */
 
-import Game, { MIN_PLAYERS, MAX_PLAYERS } from '../../public/js/game.js';
+import Game, { MIN_PLAYERS, MAX_PLAYERS, MODES } from '../../public/js/game.js';
 import { createGameView } from '../../public/js/game-view.js';
 import { runCpuStep, isCpuTurn } from '../../public/js/cpu-player.js';
 
@@ -21,13 +21,19 @@ export default {
     allowCpu: true,
     stamps: ['👍', '🙏', '😮', '😭', '🤝', '🎉'],
 
+    // ホストがロビーで選ぶ設定：モード（通常 / リアルタイム）
+    settings: {
+        defaults: () => ({ mode: 'classic' }),
+        validate: (patch, current) => ({ ...current, mode: MODES.includes(patch.mode) ? patch.mode : current?.mode ?? 'classic' })
+    },
+
     // シードは共通部品の乱数から作る（テストでは乱数を固定できる）
-    create: ({ players, random }) => new Game(players, { seed: Math.floor(random() * 2 ** 32) }),
+    create: ({ players, random, settings }) => new Game(players, { seed: Math.floor(random() * 2 ** 32), mode: settings?.mode }),
 
     // 保存するのは記録だけ。読み込むたびに記録から再現する
     persist: (game) => ({
         players: game.players.map(({ name, isCPU }) => ({ name, isCPU })),
-        options: { seed: game.seed },
+        options: { seed: game.seed, mode: game.mode },
         commands: game.commands
     }),
     restore: (saved) => Game.replay(saved.players, saved.options, saved.commands),

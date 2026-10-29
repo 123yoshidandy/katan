@@ -27,6 +27,28 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(a.last('lobby').players.map(p => p.name)).toEqual(['あき', 'はる']);
     });
 
+    it('ホストがリアルタイムモードを選ぶと、そのモードで始まり、全員が同時に動ける', async () => {
+        const server = createTestServer(game);
+        const clients = await server.createRoom(['あき', 'はる']);
+        expect(clients[0].last('lobby').settings.mode).toBe('classic');
+        await clients[1].send('setSettings', { settings: { mode: 'realtime' } });
+        expect(clients[1].last('error')).toBeTruthy();
+        await clients[0].send('setSettings', { settings: { mode: 'realtime' } });
+        expect(clients[1].last('lobby').settings.mode).toBe('realtime');
+        await clients[0].send('start');
+        await finishSetup(clients);
+        const view = clients[0].last('state').view;
+        expect(view.mode).toBe('realtime');
+        expect(view.phase).toBe('play');
+        expect(view.rolls.every(Boolean)).toBe(true);
+        // 7 で片付ける処理がない人は、相手を待たずに完了できる。全員が完了すると次の巡に進む
+        const free = clients.filter(c => !c.last('state').view.pending);
+        for (const client of free) await client.send('command', { command: { type: 'endTurn' } });
+        const after = clients[0].last('state').view;
+        if (free.length === clients.length) expect(after.turnNumber).toBe(2);
+        else expect(after.done).toEqual(clients.map(c => free.includes(c)));
+    });
+
     it('1人では始められず、CPU を足せばホストが始められる', async () => {
         const server = createTestServer(game);
         const [a] = await server.createRoom(['あき']);

@@ -10,6 +10,7 @@ import { hydrateGameView } from './game-view.js';
 
 const STORAGE_KEY = 'katan.online'; // 再接続に使う部屋コードとトークン
 const CPU_STEP_DELAY_MS = 700;              // CPUの手はローカル対戦と同じ間隔で順に見せる
+const REALTIME_CPU_STEP_DELAY_MS = 350;     // リアルタイムモードでは、CPU が並んで動くので間を短くする
 
 // 保存した参加情報（部屋コード・トークン・席・名前）
 export function loadOnlineSession() {
@@ -31,6 +32,7 @@ export default class OnlineGameController {
         this.net.on('lobby', (lobby) => {
             // ロビーに戻ったら、前のゲームの表示を消す
             if (lobby.status === 'lobby') this.view = null;
+            this.net.cpuStepDelayMs = lobby.settings?.mode === 'realtime' ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS;
             listeners.onLobby?.(lobby);
         });
         this.net.on('state', ({ view }) => {
@@ -59,6 +61,7 @@ export default class OnlineGameController {
     addCpu() { this.net.addCpu(); }
     removeCpu(seat) { this.net.removeCpu(seat); }
     startGame() { this.net.start(); }
+    setMode(mode) { this.net.setSettings({ mode }); }
     backToLobby() { this.net.backToLobby(); }
     isHost() { return this.net.isHost(); }
     inviteUrl() { return this.net.inviteUrl(); }
