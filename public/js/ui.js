@@ -46,6 +46,15 @@ function element(tag, { className, text, onClick, disabled, title } = {}, childr
     return node;
 }
 
+// 切り替えボタン（.segmented）の選択を描く
+function selectSegment(group, value) {
+    group.querySelectorAll('button').forEach(button => {
+        const selected = (button.dataset.mode ?? button.dataset.count) === value;
+        button.classList.toggle('selected', selected);
+        button.setAttribute('aria-checked', String(selected));
+    });
+}
+
 function loadSetup() {
     try {
         return JSON.parse(localStorage.getItem(SETUP_KEY) || 'null');
@@ -132,6 +141,7 @@ export default class UI {
     showSetup() {
         const setup = loadSetup() ?? { count: 3, seats: [] };
         this.setPlayerCount(setup.count, setup.seats);
+        this.setGameMode(setup.mode ?? 'classic');
         this.showScreen('setup');
     }
 
@@ -176,6 +186,14 @@ export default class UI {
         $('player-count').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-count]');
             if (button) this.setPlayerCount(button.dataset.count);
+        });
+        $('mode-select').addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-mode]');
+            if (button) this.setGameMode(button.dataset.mode);
+        });
+        $('lobby-mode').addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-mode]');
+            if (button && this.online?.isHost()) this.online.setMode(button.dataset.mode);
         });
         $('start-local').addEventListener('click', () => this.startLocal());
         $('open-online').addEventListener('click', () => this.showOnlineMenu());
@@ -397,10 +415,22 @@ export default class UI {
         }));
     }
 
+    // 開始画面のモード（classic / realtime）
+    setGameMode(mode) {
+        this.gameMode = mode === 'realtime' ? 'realtime' : 'classic';
+        selectSegment($('mode-select'), this.gameMode);
+    }
+
     startLocal(players = null) {
         if (!players) {
             players = this.readSeats();
-            saveSetup({ count: players.length, seats: players });
+            saveSetup({ count: players.length, seats: players, mode: this.gameMode });
+            // リアルタイムは全員が同時に動くので、同じ端末では人間1人まで
+            if (this.gameMode === 'realtime' && players.filter(p => !p.isCPU).length > 1) {
+                this.toast('リアルタイムは、人間1人とCPUで遊ぶモードです（人間どうしはオンライン対戦で）');
+                return;
+            }
+            this.localMode = this.gameMode;
         }
         this.controller?.stop?.();
         this.localPlayers = players;
@@ -410,7 +440,7 @@ export default class UI {
         this.controller = new LocalGameController(players, {
             onUpdate: () => this.renderGame(),
             onError: (message) => this.toast(message)
-        });
+        }, { mode: this.localMode });
         $('stamp-button').classList.add('hidden');
         this.showScreen('game');
         this.renderGame();
@@ -492,6 +522,9 @@ export default class UI {
             }
             list.append(item);
         });
+        const mode = lobby.settings?.mode ?? 'classic';
+        selectSegment($('lobby-mode'), mode);
+        $('lobby-mode').querySelectorAll('button').forEach(button => { button.disabled = !isHost && button.dataset.mode !== mode; });
         $('host-controls').classList.toggle('hidden', !isHost);
         $('guest-note').classList.toggle('hidden', isHost);
         $('add-cpu').disabled = lobby.players.length >= MAX_PLAYERS;
@@ -726,7 +759,8 @@ export default class UI {
         dice.replaceChildren();
         if (!view.dice) return;
         // サイコロは、振った人の色にする（最後のサイコロのイベントから。なければ手番の人）
-        const roller = [...(view.events ?? [])].reverse().find(e => e.type === 'roll')?.player ?? view.currentPlayerId;
+        const roller = view.realtime && view.me ? view.me.id
+            : [...(view.events ?? [])].reverse().find(e => e.type === 'roll')?.player ?? view.currentPlayerId;
         view.dice.forEach(value => {
             const die = element('span', { className: `die face-${value} owner-${roller}` });
             for (let i = 0; i < value; i++) die.append(element('i'));
@@ -754,7 +788,10 @@ export default class UI {
     playerRow(view, player, { tile = false } = {}) {
         const row = element('div', { className: `player${tile ? ' tile' : ''}` });
         row.dataset.seat = player.id;
-        row.classList.toggle('current', player.id === view.currentPlayerId && view.phase !== 'end');
+        // リアルタイムモードでは、まだ完了していない人を金色の枠にし、完了した人には「完了」を出す
+        const acting = view.realtime ? !view.done[player.id] : player.id === view.currentPlayerId;
+        row.classList.toggle('current', acting && view.phase !== 'end');
+        row.classList.toggle('finished', Boolean(view.realtime && view.done[player.id]));
         row.classList.toggle('me', player === view.me);
         const swatch = element('span', { className: 'swatch' });
         swatch.style.background = PLAYER_COLORS[player.id];
@@ -798,6 +835,10 @@ export default class UI {
         if (view.discardCount > 0) return `手札を${view.discardCount}枚捨ててください`;
         if (view.pending?.type === 'discard') return '手札を捨てる人を待っています';
         if (view.tradeWaiting) return `${view.players[view.trade.from].name}からの交換の申し出です`;
+        if (view.realtime && view.me && view.done[view.me.id]) {
+            const left = view.done.filter(d => !d).length;
+            return `ほかの人の完了を待っています（あと${left}人）`;
+        }
         if (!view.isMyTurn) return view.logs.at(-1) ?? '';
         if (view.phase === 'setup') {
             return view.setup.step === 'settlement' ? '開拓地を置く場所を選んでください' : '開拓地から伸ばす道を選んでください';
@@ -872,8 +913,17 @@ export default class UI {
         $('actions').classList.toggle('hidden', !me || view.phase === 'end');
         if (!me) return;
         $('act-roll').disabled = !(canAct && !view.rolled);
-        $('act-roll').classList.toggle('hidden', view.rolled && view.isMyTurn);
-        $('act-end').classList.toggle('hidden', !(view.rolled && view.isMyTurn));
+        if (view.realtime) {
+            // サイコロは巡のはじめに自動で振るので出さない。完了したら、全員を待つ
+            const finished = view.done[me.id];
+            $('act-roll').classList.add('hidden');
+            $('act-end').classList.remove('hidden');
+            $('act-end').textContent = finished ? '待っています' : '完了';
+        } else {
+            $('act-roll').classList.toggle('hidden', view.rolled && view.isMyTurn);
+            $('act-end').classList.toggle('hidden', !(view.rolled && view.isMyTurn));
+            $('act-end').textContent = '手番を終える';
+        }
         ['road', 'settlement', 'city'].forEach(piece => {
             const button = $(`act-${piece}`);
             button.disabled = !this.canBuild(view, piece);

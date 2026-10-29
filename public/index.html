@@ -32,6 +32,13 @@
                             <button type="button" role="radio" data-count="4">4人</button>
                         </div>
                     </div>
+                    <!-- モード：通常（手番を順に回す）/ リアルタイム（全員が同時に動く。人間1人とCPUで遊ぶ） -->
+                    <div class="row">モード
+                        <div id="mode-select" class="segmented" role="radiogroup" aria-label="モード">
+                            <button type="button" role="radio" data-mode="classic">通常</button>
+                            <button type="button" role="radio" data-mode="realtime">リアルタイム</button>
+                        </div>
+                    </div>
                     <div id="seat-list"></div>
                     <div class="buttons">
                         <button id="start-local" class="primary">ゲーム開始</button>
@@ -88,6 +95,12 @@
                     <button id="share-invite">招待URLを共有</button>
                 </div>
                 <ul id="lobby-players"></ul>
+                <div class="row">モード
+                    <div id="lobby-mode" class="segmented" role="radiogroup" aria-label="モード">
+                        <button type="button" role="radio" data-mode="classic">通常</button>
+                        <button type="button" role="radio" data-mode="realtime">リアルタイム</button>
+                    </div>
+                </div>
                 <div id="host-controls" class="buttons">
                     <button id="add-cpu">CPUを追加</button>
                     <button id="start-online" class="primary">ゲーム開始</button>
@@ -287,6 +300,16 @@
                     <li><strong>都市</strong>：小麦2・鉄3（自分の開拓地を都市にする）</li>
                     <li><strong>発展カード</strong>：羊毛・小麦・鉄</li>
                 </ul>
+            </section>
+            <section>
+                <h3>⚡ リアルタイムモード</h3>
+                <p>ほかの人の手番を待たずに、全員が同時に動くモードです（タイトル画面やロビーで選びます）。初期配置は順番どおりです。</p>
+                <ol>
+                    <li>巡のはじめに、<strong>全員が同時にサイコロを振ります</strong>（自動）。どの人の目でも、全員が資源をもらいます</li>
+                    <li>各自が好きな順に、建設・交換・発展カード（1巡に1枚）を行い、<strong>完了</strong>を押します。同じ場所に建てたいときは<strong>早い者勝ち</strong>です</li>
+                    <li>全員が完了したら、次の巡に進みます。10点に達したら、その場で勝ちです</li>
+                </ol>
+                <p>7 が出たら、その巡の資源をもらう前に、手札が8枚以上の人は半分を捨て、7を出した人が盗賊を動かします。交渉は誰でも持ちかけられます（同時に進むのは1つまで）。同じ端末では、人間1人とCPUで遊べます。</p>
             </section>
             <section>
                 <h3>🦹 7 と盗賊</h3>

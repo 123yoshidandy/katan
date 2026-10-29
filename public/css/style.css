@@ -190,6 +190,7 @@ button.link {
     box-shadow: none;
     background: transparent;
     padding: 5px 12px;
+    white-space: nowrap;
 }
 
 .segmented button.selected {
@@ -225,6 +226,7 @@ input {
     justify-content: space-between;
     gap: 10px;
     margin: 6px 0;
+    white-space: nowrap;
 }
 
 .hint {
@@ -769,6 +771,16 @@ input {
     border: 2px solid transparent;
 }
 
+/* リアルタイムモードで、この巡を完了した人 */
+.player.finished {
+    opacity: 0.6;
+}
+
+.player.finished .name::before {
+    content: "✓ ";
+    color: var(--sea-deep);
+}
+
 .player.current {
     border-color: var(--gold);
     background: var(--panel);
@@ -1309,7 +1321,75 @@ dialog::backdrop {
     }
 
     .title-side .panel {
-        padding: 8px 10px;
+        padding: 6px 10px;
+    }
+
+    /* 人数・モードの切り替えと、席の行を詰める */
+    .title-side .row {
+        margin: 3px 0;
+    }
+
+    .title-side .segmented button {
+        padding: 3px 10px;
+    }
+
+    .title-side {
+        gap: 3px;
+    }
+
+    /* ロビー：4人とモードの行が収まるよう詰める */
+    #screen-online, #screen-lobby {
+        padding: 6px;
+    }
+
+    #screen-lobby .panel {
+        padding: 8px 14px;
+    }
+
+    #screen-lobby h2 {
+        margin-bottom: 4px;
+    }
+
+    #lobby-players {
+        margin: 4px 0;
+    }
+
+    #lobby-players li {
+        padding: 2px 0;
+    }
+
+    #screen-lobby .buttons {
+        gap: 6px;
+        margin: 4px 0;
+    }
+
+    #screen-lobby .row {
+        margin: 3px 0;
+    }
+
+    #seat-list {
+        gap: 2px;
+    }
+
+    .seat input[data-role=name] {
+        padding: 0 8px;
+    }
+
+    /* 「ゲーム開始」と「オンラインで遊ぶ」を横に並べる */
+    .title-side .buttons {
+        margin-top: 4px;
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .title-side .buttons button {
+        padding: 6px 10px;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+
+    .setup-footer {
+        margin-top: 2px;
     }
 
     .player {

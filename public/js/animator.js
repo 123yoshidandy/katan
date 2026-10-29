@@ -22,7 +22,7 @@ const DROP_MS = 380;     // 建物が落ちる時間
 const ROBBER_MS = 480;   // 盗賊が跳ぶ時間
 const STAGGER_MS = 70;   // 何枚も飛ぶときの間隔
 const MAX_CARDS = 5;     // 1組で飛ばすカードの上限（多すぎると見づらい）
-const MAX_EVENTS = 8;    // 1度に見せるイベントの上限（再接続などでたまった分は省く）
+const MAX_EVENTS = 12;   // 1度に見せるイベントの上限（再接続などでたまった分は省く。リアルタイムモードの巡のはじめは、全員のサイコロと生産で8件ほど）
 const MAX_WAIT_MS = 400; // 前の演出の終わりを待つ上限（CPU の手が続いても遅れがたまらないように）
 const AWARD_NAMES = { longestRoad: '交易路', largestArmy: '騎士力' };
 
@@ -46,9 +46,18 @@ export function playAnimations(previous, view, refs) {
     const now = performance.now();
     // 前の演出が続いていれば、そのあとに続ける
     let t = Math.min(Math.max(0, busyUntil - now), MAX_WAIT_MS);
+    // 続けて届いたサイコロ（リアルタイムモードで全員が同時に振ったもの）は、同時に投げ込む
+    let rollStart = null;
     events.forEach(event => {
         const play = PLAYERS[event.type];
-        if (play) t = play(stage, event, t);
+        if (!play) return;
+        if (event.type === 'roll') {
+            rollStart ??= t;
+            t = Math.max(t, play(stage, event, rollStart));
+        } else {
+            rollStart = null;
+            t = play(stage, event, t);
+        }
     });
     busyUntil = now + t;
 }

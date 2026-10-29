@@ -9,12 +9,13 @@ import { createGameView, hydrateGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn } from './cpu-player.js';
 
 const CPU_STEP_DELAY_MS = 700; // CPUの手は1手ずつ間を置いて見せる
+const REALTIME_CPU_STEP_DELAY_MS = 350; // リアルタイムモードでは、CPU が並んで動くので間を短くする
 
 export default class LocalGameController {
-    // players: [{ name, isCPU }] / listeners: onUpdate() / onError(message)
-    constructor(players, listeners = {}) {
+    // players: [{ name, isCPU }] / listeners: onUpdate() / onError(message) / options: { mode }
+    constructor(players, listeners = {}, { mode = 'classic' } = {}) {
         this.listeners = listeners;
-        this.game = new Game(players);
+        this.game = new Game(players, { mode });
         this.cpuTimer = null;
         this.lastHumanId = null;
         this.scheduleCpu();
@@ -58,7 +59,7 @@ export default class LocalGameController {
             runCpuStep(this.game);
             this.listeners.onUpdate?.();
             this.scheduleCpu();
-        }, CPU_STEP_DELAY_MS);
+        }, this.game.isRealtimePlay() ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS);
     }
 
     stop() {
