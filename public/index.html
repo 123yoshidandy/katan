@@ -266,10 +266,14 @@
         </div>
         <div class="segmented help-tabs" role="tablist">
             <button type="button" role="tab" data-help-tab="basic">基本</button>
+            <button type="button" role="tab" data-help-tab="flow">流れ</button>
             <button type="button" role="tab" data-help-tab="points">得点</button>
-            <button type="button" role="tab" data-help-tab="build">建設・交換</button>
-            <button type="button" role="tab" data-help-tab="robber">盗賊・発展</button>
+            <button type="button" role="tab" data-help-tab="build">建設</button>
+            <button type="button" role="tab" data-help-tab="trade">交換</button>
+            <button type="button" role="tab" data-help-tab="robber">盗賊</button>
+            <button type="button" role="tab" data-help-tab="dev">発展</button>
             <button type="button" role="tab" data-help-tab="screen">画面</button>
+            <button type="button" role="tab" data-help-tab="assist">アシスト</button>
             <button type="button" role="tab" data-help-tab="realtime">リアルタイム</button>
         </div>
         <div class="help-body">
@@ -286,6 +290,8 @@
                     <div data-pic="production"></div>
                     <div data-pic="odds"></div>
                 </section>
+            </div>
+            <div class="help-page" data-help-page="flow">
                 <section>
                     <h3>🏠 初期配置</h3>
                     <p>順番に開拓地と道を1つずつ置き、折り返して逆の順にもう1組置きます。2つ目の開拓地の周りの資源をもらって始まります。</p>
@@ -303,23 +309,22 @@
             <div class="help-page" data-help-page="points">
                 <section>
                     <h3>🏆 点になるもの</h3>
-                    <p>自分の手番に<strong>10点</strong>に達したら勝ちです。</p>
-                    <ul>
-                        <li><i data-pic="piece:settlement"></i><strong>開拓地</strong>：1つ1点</li>
-                        <li><i data-pic="piece:city"></i><strong>都市</strong>：1つ2点（開拓地を都市にすると、1点増える）</li>
-                        <li><i data-pic="dev:victoryPoint"></i><strong>勝利点カード</strong>：1枚1点（発展カードから出る。ほかの人には見えない）</li>
-                        <li><i data-pic="piece:road"></i><strong>最長交易路</strong>：2点（一番長い道を持つ人。ボーナス）</li>
-                        <li><i data-pic="dev:knight"></i><strong>最大騎士力</strong>：2点（騎士を一番多く使った人。ボーナス）</li>
+                    <ul class="point-list">
+                        <li><i data-pic="piece:settlement"></i><strong>開拓地</strong>：1点</li>
+                        <li><i data-pic="piece:city"></i><strong>都市</strong>：2点</li>
+                        <li><i data-pic="dev:victoryPoint"></i><strong>勝利点カード</strong>：1点</li>
+                        <li><i data-pic="piece:road"></i><strong>最長交易路</strong>：2点</li>
+                        <li><i data-pic="dev:knight"></i><strong>最大騎士力</strong>：2点</li>
                     </ul>
                 </section>
                 <section>
                     <h3>🛣️ 最長交易路</h3>
-                    <p>5本以上つながった道を最初に作った人が、ボーナスの2点を得ます。もっと長い道を作った人に移ります。道の途中の角にほかの人が開拓地を建てると、道はそこで切れて数えます。</p>
+                    <p>ボーナスです。5本以上つながった道を最初に作った人が得て、もっと長い道を作った人に移ります。道の途中の角にほかの人が開拓地を建てると、そこで切れて数えます。</p>
                     <div data-pic="longest"></div>
                 </section>
                 <section>
                     <h3>⚔️ 最大騎士力</h3>
-                    <p>騎士のカードを3枚以上使った人のうち、最初に3枚使った人が、ボーナスの2点を得ます。ほかの人がもっと多く使うと、その人に移ります。</p>
+                    <p>ボーナスです。騎士を最初に3枚使った人が得て、もっと多く使った人に移ります。</p>
                 </section>
             </div>
             <div class="help-page" data-help-page="build">
@@ -333,6 +338,8 @@
                     </ul>
                     <p>1人が置けるのは、<i data-pic="piece:road"></i>道15本・<i data-pic="piece:settlement"></i>開拓地5つ・<i data-pic="piece:city"></i>都市4つまでです。開拓地を都市にすると、その開拓地は手元に戻り、また建てられます。</p>
                 </section>
+            </div>
+            <div class="help-page" data-help-page="trade">
                 <section>
                     <h3>🤝 交換</h3>
                     <p>銀行とは同じ資源4枚で好きな資源1枚と交換できます。港に建物があれば 3:1、資源の描かれた港なら その資源 2:1 で交換できます。</p>
@@ -346,6 +353,8 @@
                     <p>7 が出たら、手札が8枚以上の人は半分（切り捨て）を捨てます。サイコロを振った人は盗賊を別のタイルに動かし、そのタイルに建物を持つ人から1枚奪います。盗賊のいるタイルからは資源が出ません。</p>
                     <div data-pic="robber"></div>
                 </section>
+            </div>
+            <div class="help-page" data-help-page="dev">
                 <section>
                     <h3>🃏 発展カード</h3>
                     <ul>
@@ -365,27 +374,21 @@
                     <div class="ui-sample" data-sample="me"></div>
                     <p>相手の欄は、盤面の上（横画面では右の列の上）に並びます。上の縁がその人の色です。</p>
                     <div class="ui-sample tile-sample" data-sample="tile"></div>
-                    <ul>
-                        <li><strong>手札</strong>：資源カードの枚数</li>
-                        <li><strong>発展</strong>：発展カードの枚数</li>
-                        <li><strong>騎士</strong>：使った騎士の数</li>
-                        <li><strong>道</strong>：一番長い道の長さ</li>
-                        <li><strong>右端の数字</strong>：得点</li>
-                    </ul>
-                    <p>最長交易路・最大騎士力（それぞれ2点）を持っている人は、その欄が金色になります（この例では、あなたが最長交易路、CPU1が最大騎士力）。</p>
+                    <p><strong>手札</strong>：資源カードの枚数　<strong>発展</strong>：発展カードの枚数　<strong>騎士</strong>：使った騎士の数　<strong>道</strong>：一番長い道の長さ　<strong>右端</strong>：得点</p>
+                    <p>最長交易路・最大騎士力を持っている人は、その欄が金色になります（この例では、あなたが最長交易路、CPU1が最大騎士力）。</p>
                 </section>
+            </div>
+            <div class="help-page" data-help-page="assist">
                 <section>
                     <h3>💡 アシスト</h3>
-                    <p>電球のボタンで ON/OFF を切り替えられます。ON のときは、次のように手助けします。</p>
-                    <h4>説明の欄</h4>
+                    <p>電球のボタンで ON/OFF を切り替えます。</p>
                     <div class="ui-sample" data-sample="coach"></div>
-                    <p>手札の上で、何を目指すか・何が足りないか・だから今どうするか（青い文字）を説明します。足りない資源の図柄は薄くなります。</p>
-                    <h4>盤面の印</h4>
+                    <p><strong>説明の欄</strong>：今どうするかを青い文字で示します。</p>
                     <div data-pic="assist"></div>
-                    <h4>ボタン</h4>
-                    <div class="ui-sample button-sample" data-sample="button"></div>
-                    <p>足りない資源の図柄は薄くなります。★はおすすめの手（CPU ならこうする、という手）で、説明の欄の青い文字と同じ手です。</p>
-                    <p>はじめは、★の場所に置き、★のボタンを押していけば遊べます。慣れてきたら、自分の作戦で選んでみてください。</p>
+                    <div class="pic-row">
+                        <div class="ui-sample button-sample" data-sample="button"></div>
+                        <p>足りない資源は薄く、★はおすすめの手</p>
+                    </div>
                 </section>
             </div>
             <div class="help-page" data-help-page="realtime">

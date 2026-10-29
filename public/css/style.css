@@ -1218,33 +1218,95 @@ dialog::backdrop {
     overflow-y: auto;
 }
 
-/* 遊び方のタブ（幅いっぱいに6つ並べる） */
+/* 遊び方のタブ（5つずつ2段。1つのタブは、スクロールせずに1画面で読める量にする） */
 .help-tabs {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
     width: 100%;
     flex: none;
     margin-bottom: 6px;
 }
 
 .help-tabs button {
-    flex: 1 1 auto;
-    padding: 5px 2px;
-    font-size: 0.76rem;
+    padding: 4px 2px;
+    font-size: 0.8rem;
 }
 
 .help-body section {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .help-body h3 {
-    margin: 6px 0 4px;
+    margin: 4px 0 2px;
     font-size: 1rem;
 }
 
 .help-body p, .help-body li {
     font-size: 0.9rem;
-    line-height: 1.6;
+    line-height: 1.5;
     margin: 2px 0;
+}
+
+/* 得点の一覧は短いので2列に並べる */
+.help-body .point-list {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: start;
+    column-gap: 16px;
+    padding-left: 0;
+    list-style: none;
+}
+
+/* 低い横画面：画面いっぱいに広げ、左に見出しとタブ、右に本文を2段組で置く */
+@media (orientation: landscape) and (max-height: 500px) {
+    .help {
+        width: calc(100vw - 16px);
+        max-width: none;
+        height: calc(100dvh - 16px);
+        padding: 10px 14px;
+    }
+
+    .help[open] {
+        display: grid;
+        grid-template-columns: 104px 1fr;
+        grid-template-rows: auto 1fr;
+        column-gap: 16px;
+    }
+
+    .help .sheet-head {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .help .sheet-head h2 {
+        font-size: 1.1rem;
+    }
+
+    .help-tabs {
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: 1fr;
+        align-self: start;
+    }
+
+    .help-tabs button {
+        padding: 2px;
+    }
+
+    .help-body {
+        grid-column: 2;
+        grid-row: 1 / 3;
+        column-count: 2;
+        column-gap: 18px;
+    }
+
+    .help-body section,
+    .help-body .pic-row,
+    .help-body .ui-sample,
+    .help-body li {
+        break-inside: avoid;
+    }
 }
 
 /* ===== 遊び方の図（help-pictures.js） ===== */
@@ -1380,13 +1442,13 @@ dialog::backdrop {
 .pic-caption {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
     margin: 6px 0;
     font-size: 0.9rem;
 }
 
 .pic-caption > div {
-    line-height: 1.9;
+    line-height: 1.6;
 }
 
 .pic-arrow {
