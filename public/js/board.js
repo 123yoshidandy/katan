@@ -12,7 +12,6 @@ import { shuffle } from './random.js';
 export const RESOURCES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
 
 export const RESOURCE_NAMES = { wood: '木材', brick: 'レンガ', sheep: '羊毛', wheat: '小麦', ore: '鉄' };
-export const TERRAIN_NAMES = { wood: '森', brick: '丘陵', sheep: '牧草地', wheat: '畑', ore: '山地', desert: '砂漠' };
 
 const TERRAINS = [
     ...Array(4).fill('wood'), ...Array(3).fill('brick'), ...Array(4).fill('sheep'),
