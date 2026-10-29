@@ -128,9 +128,8 @@ describe('イベントの記録', () => {
         game.players[id].hand = cards({ wood: 1 });
         game.players[other].hand = cards({ ore: 1 });
         game.applyCommand(id, { type: 'offerTrade', give: { wood: 1 }, get: { ore: 1 } });
-        game.applyCommand(other, { type: 'respondTrade', id: game.trade.id, accept: true });
         since = game.eventSerial;
-        expect(game.applyCommand(id, { type: 'confirmTrade', id: game.trade.id, with: other })).toBe(true);
+        expect(game.applyCommand(other, { type: 'respondTrade', id: game.trade.id, accept: true })).toBe(true);
         expect(newEvents(game, since)).toEqual([{ id: since + 1, type: 'trade', from: id, to: other, give: cards({ wood: 1 }), get: cards({ ore: 1 }) }]);
     });
 

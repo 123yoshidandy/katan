@@ -122,8 +122,7 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(other.last('state').view.trade.from).toBe(clients.indexOf(current));
         const tradeId = other.last('state').view.trade.id;
         await other.send('command', { command: { type: 'respondTrade', id: tradeId, accept: true } });
-        expect(current.last('state').view.trade.responses[clients.indexOf(other)]).toBe('accept');
-        await current.send('command', { command: { type: 'confirmTrade', id: tradeId, with: clients.indexOf(other) } });
+        expect(current.last('state').view.trade).toBeNull();
         expect(other.last('state').view.trade).toBeNull();
         expect(other.last('state').view.players[clients.indexOf(other)].hand[giveResource]).toBe(theirs[giveResource] + 1);
     });

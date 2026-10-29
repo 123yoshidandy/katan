@@ -115,7 +115,7 @@ export default class Game {
         // 手番の途中で、ほかのことより先に片付ける処理
         // { type: 'discard', remaining: { 席: 枚数 } } / { type: 'robber' } / { type: 'roadBuilding', remaining }
         this.pending = null;
-        this.trade = null;             // 交渉 { id, from, give, get, responses: { 席: 'accept' | 'reject' } }
+        this.trade = null;             // 交渉 { id, from, give, get, responses: { 席: 'reject' } }（受けた人が出たら、その場で交換して終わる）
         this.tradeSerial = 0;          // 交渉の通し番号（取り下げたあとに届いた、古い交渉への返事を断るため）
         this.longestRoad = null;       // 最長交易路の持ち主
         this.largestArmy = null;       // 最大騎士力の持ち主
@@ -176,7 +176,7 @@ export default class Game {
         if (this.pending?.type === 'discard') return this.reject('手札を捨てる人を待っています');
 
         // 交渉中に手番の人がほかの操作をしたら、交渉は取り下げる
-        const keepsTrade = ['confirmTrade', 'cancelTrade', 'offerTrade'].includes(type);
+        const keepsTrade = ['cancelTrade', 'offerTrade'].includes(type);
         const accepted = this.applyTurnCommand(player, command);
         if (accepted && !keepsTrade && this.trade) this.trade = null;
         if (accepted) this.checkWin(player);
@@ -205,8 +205,6 @@ export default class Game {
                 return this.record(player.id, { type, give: command.give, get: command.get }, () => this.bankTrade(player, command.give, command.get));
             case 'offerTrade':
                 return this.record(player.id, { type, give: command.give, get: command.get }, () => this.offerTrade(player, command.give, command.get));
-            case 'confirmTrade':
-                return this.record(player.id, { type, id: command.id, with: command.with }, () => this.confirmTrade(player, command.id, command.with));
             case 'cancelTrade':
                 return this.record(player.id, { type }, () => this.cancelTrade(player));
             case 'endTurn':
@@ -631,29 +629,27 @@ export default class Game {
         return true;
     }
 
+    // 受けたら、その場で交換する（先に受けた人と交換する）
     respondTrade(player, id, accept) {
-        if (!this.trade || this.trade.id !== id) return this.reject('その交渉は終わっています');
-        if (player.id === this.trade.from) return this.reject('自分の交渉には答えられません');
-        if (accept && !hasCards(player.hand, this.trade.get)) return this.reject('求められた資源を持っていません');
-        this.trade.responses[player.id] = accept ? 'accept' : 'reject';
-        this.log(`${player.name}が交渉を${accept ? '受けました' : '断りました'}`);
-        return true;
-    }
-
-    confirmTrade(player, id, partnerId) {
         const trade = this.trade;
         if (!trade || trade.id !== id) return this.reject('その交渉は終わっています');
-        if (trade.from !== player.id) return this.reject('自分の交渉ではありません');
-        if (trade.responses[partnerId] !== 'accept') return this.reject('その人は交渉を受けていません');
-        const partner = this.players[partnerId];
-        if (!hasCards(player.hand, trade.give) || !hasCards(partner.hand, trade.get)) return this.reject('資源が足りなくなっています');
-        addCards(player.hand, trade.give, -1);
-        addCards(partner.hand, trade.give);
-        addCards(partner.hand, trade.get, -1);
-        addCards(player.hand, trade.get);
-        this.emit('trade', { from: player.id, to: partnerId, give: { ...trade.give }, get: { ...trade.get } });
+        if (player.id === trade.from) return this.reject('自分の交渉には答えられません');
+        if (trade.responses[player.id]) return this.reject('もう答えています');
+        if (!accept) {
+            trade.responses[player.id] = 'reject';
+            this.log(`${player.name}が交渉を断りました`);
+            return true;
+        }
+        if (!hasCards(player.hand, trade.get)) return this.reject('求められた資源を持っていません');
+        const from = this.players[trade.from];
+        if (!hasCards(from.hand, trade.give)) return this.reject('持ちかけた人の資源が足りなくなっています');
+        addCards(from.hand, trade.give, -1);
+        addCards(player.hand, trade.give);
+        addCards(player.hand, trade.get, -1);
+        addCards(from.hand, trade.get);
+        this.emit('trade', { from: from.id, to: player.id, give: { ...trade.give }, get: { ...trade.get } });
         this.trade = null;
-        this.log(`${player.name}と${partner.name}が交換しました（${formatCards(trade.give)} ⇄ ${formatCards(trade.get)}）`);
+        this.log(`${from.name}と${player.name}が交換しました（${formatCards(trade.give)} ⇄ ${formatCards(trade.get)}）`);
         return true;
     }
 

@@ -12,7 +12,7 @@ import { runCpuStep, isCpuTurn } from '../../public/js/cpu-player.js';
 // 端末から送れる操作（proxy はサーバーだけが使う）
 const PLAYER_COMMANDS = [
     'build', 'roll', 'moveRobber', 'discard', 'buyDevCard', 'playDev',
-    'bankTrade', 'offerTrade', 'respondTrade', 'confirmTrade', 'cancelTrade', 'endTurn'
+    'bankTrade', 'offerTrade', 'respondTrade', 'cancelTrade', 'endTurn'
 ];
 
 export default {

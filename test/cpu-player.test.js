@@ -28,8 +28,10 @@ describe('CPU', () => {
         game.players[1].hand = { wood: 1, brick: 0, sheep: 0, wheat: 0, ore: 0 };
         game.applyCommand(0, { type: 'offerTrade', give: { ore: 3 }, get: { wood: 1 } });
         expect(cpuActor(game)).toBe(1);
+        // 得な交渉なので受け、その場で交換が成立する
         runCpuStep(game);
-        expect(game.trade.responses[1]).toBeDefined();
+        expect(game.trade).toBeNull();
+        expect(game.players[0].hand.wood).toBe(1);
         expect(cpuActor(game)).toBeNull();
     });
 

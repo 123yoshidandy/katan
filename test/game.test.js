@@ -273,7 +273,7 @@ describe('交換', () => {
         expect(player.hand).toEqual(cards({ ore: 1 }));
     });
 
-    it('交渉は受けた人の中から手番の人が相手を選んで成立する', () => {
+    it('交渉は、誰かが受けた時点でその人と成立する（早い者勝ち）', () => {
         const game = afterSetup(3);
         const id = rolled(game);
         const [b, c] = [(id + 1) % 3, (id + 2) % 3];
@@ -283,13 +283,24 @@ describe('交換', () => {
         expect(game.applyCommand(id, { type: 'offerTrade', give: { wood: 2 }, get: { ore: 1 } })).toBe(true);
         expect(game.actors()).toEqual(expect.arrayContaining([b, c, id]));
         const tradeId = game.trade.id;
-        expect(game.applyCommand(id, { type: 'confirmTrade', id: tradeId, with: b })).toBe(false);
         expect(game.applyCommand(b, { type: 'respondTrade', id: tradeId, accept: false })).toBe(true);
+        expect(game.applyCommand(b, { type: 'respondTrade', id: tradeId, accept: true })).toBe(false);
         expect(game.applyCommand(c, { type: 'respondTrade', id: tradeId, accept: true })).toBe(true);
-        expect(game.applyCommand(id, { type: 'confirmTrade', id: tradeId, with: c })).toBe(true);
         expect(game.players[id].hand).toEqual(cards({ ore: 1 }));
         expect(game.players[c].hand).toEqual(cards({ wood: 2 }));
         expect(game.trade).toBeNull();
+    });
+
+    it('持ちかけた人の資源が足りなくなっていたら、受けられない', () => {
+        const game = afterSetup(3);
+        const id = rolled(game);
+        const b = (id + 1) % 3;
+        game.players[id].hand = cards({ wood: 2 });
+        game.players[b].hand = cards({ ore: 1 });
+        expect(game.applyCommand(id, { type: 'offerTrade', give: { wood: 2 }, get: { ore: 1 } })).toBe(true);
+        game.players[id].hand = cards({ wood: 1 });
+        expect(game.applyCommand(b, { type: 'respondTrade', id: game.trade.id, accept: true })).toBe(false);
+        expect(game.players[b].hand).toEqual(cards({ ore: 1 }));
     });
 
     it('取り下げたあとに届いた、前の交渉への返事は断る', () => {

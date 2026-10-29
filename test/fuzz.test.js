@@ -25,7 +25,6 @@ function randomCommand(pick, game) {
         { type: 'bankTrade', give: resource(), get: resource() },
         { type: 'offerTrade', give: cards(), get: cards() },
         { type: 'respondTrade', id: pick([game.trade?.id, game.trade?.id, 0, null]), accept: pick([true, false]) },
-        { type: 'confirmTrade', id: pick([game.trade?.id, game.trade?.id, 0]), with: pick([0, 1, 2, 9]) },
         { type: 'cancelTrade' },
         { type: 'endTurn' },
         { type: 'nonsense' },

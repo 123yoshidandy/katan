@@ -131,8 +131,7 @@ describe('リアルタイムモード', () => {
         expect(game.applyCommand(0, { type: 'cancelTrade' })).toBe(false);
         const id = game.trade.id;
         expect(game.applyCommand(0, { type: 'respondTrade', id, accept: true })).toBe(true);
-        expect(game.applyCommand(0, { type: 'confirmTrade', id, with: 0 })).toBe(false);
-        expect(game.applyCommand(1, { type: 'confirmTrade', id, with: 0 })).toBe(true);
+        expect(game.trade).toBeNull();
         expect(game.players[1].hand).toEqual(cards({ wood: 1, ore: 1 }));
         expect(game.players[0].hand).toEqual(cards({ wood: 1 }));
     });
