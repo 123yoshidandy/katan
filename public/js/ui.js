@@ -868,13 +868,10 @@ export default class UI {
 
         if (from === view.me) {
             const replies = element('div', { className: 'replies' });
+            // 誰かが受けたら、その場で交換される
             view.players.filter(p => p !== from).forEach(player => {
                 const response = trade.responses[player.id];
-                if (response === 'accept') {
-                    replies.append(element('button', { className: 'small primary', text: `${player.name}と交換`, onClick: () => this.send({ type: 'confirmTrade', id: trade.id, with: player.id }) }));
-                } else {
-                    replies.append(element('span', { className: 'reply', text: `${player.name}：${response === 'reject' ? '見送り' : '…'}` }));
-                }
+                replies.append(element('span', { className: 'reply', text: `${player.name}：${response === 'reject' ? '見送り' : '…'}` }));
             });
             replies.append(element('button', { className: 'small', text: '取り下げる', onClick: () => this.send({ type: 'cancelTrade' }) }));
             box.append(replies);
@@ -887,7 +884,7 @@ export default class UI {
                 replies.append(element('button', { className: `small primary${mark(true)}`, text: '受ける', disabled: !canAccept, onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: true }) }));
                 replies.append(element('button', { className: `small${mark(false)}`, text: '断る', onClick: () => this.send({ type: 'respondTrade', id: trade.id, accept: false }) }));
             } else {
-                const answer = trade.responses[view.me.id] === 'accept' ? '受けました' : hasCards(view.me.hand, trade.get) ? '断りました' : '持っていないので断りました';
+                const answer = hasCards(view.me.hand, trade.get) ? '断りました' : '持っていないので断りました';
                 replies.append(element('span', { className: 'reply', text: answer }));
             }
             box.append(replies);
