@@ -1269,20 +1269,20 @@ dialog::backdrop {
 
 .pic-scene {
     display: block;
-    width: 120px;
+    width: 84px;
     height: auto;
     flex: none;
 }
 
 .pic-scene.pic-mid {
-    width: 220px;
+    width: 150px;
     max-width: 100%;
     margin: 4px auto;
 }
 
 .pic-scene.pic-wide {
     width: 100%;
-    max-width: 380px;
+    max-width: 260px;
 }
 
 .pic-label {
@@ -1309,20 +1309,20 @@ dialog::backdrop {
 
 .pic-tiles figure {
     margin: 0;
-    width: 46px;
+    width: 40px;
     text-align: center;
     font-size: 0.78rem;
 }
 
 .pic-tiles .pic-scene {
-    width: 46px;
+    width: 32px;
     margin: 0 auto 2px;
 }
 
 .pic-row {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     margin: 6px 0;
 }
 
@@ -1358,8 +1358,8 @@ dialog::backdrop {
 }
 
 .pic-badge {
-    width: 30px;
-    height: 30px;
+    width: 22px;
+    height: 22px;
     margin-right: 4px;
     vertical-align: middle;
 }
@@ -1377,7 +1377,7 @@ dialog::backdrop {
 
 .pic-odds {
     margin: 6px 0;
-    max-width: 380px;
+    max-width: 260px;
 }
 
 .pic-odds-note {
