@@ -396,7 +396,8 @@ export default class Game {
         return true;
     }
 
-    produce(sum) {
+    // sum の目で資源を配り、席ごとにもらった資源を返す（log = false なら、ログは呼び出し側でまとめて出す）
+    produce(sum, { log = true } = {}) {
         // 資源ごとに、誰が何枚もらうか
         const demand = Object.fromEntries(RESOURCES.map(r => [r, this.players.map(() => 0)]));
         const sources = []; // { player, hex, resource, count }（演出用。タイルごと・人ごと）
@@ -432,12 +433,16 @@ export default class Game {
             return { ...s, count };
         }).filter(s => s.count > 0);
         if (produced.length > 0) this.emit('produce', { gains: produced });
-        const messages = [];
         gains.forEach((cards, id) => {
-            if (countCards(cards) === 0) return;
-            this.pay(this.players[id], cards, -1);
-            messages.push(`${this.players[id].name}: ${formatCards(cards)}`);
+            if (countCards(cards) > 0) this.pay(this.players[id], cards, -1);
         });
+        if (log) this.logProduction(gains);
+        return gains;
+    }
+
+    // 生産のログ（席ごとにもらった資源）
+    logProduction(gains) {
+        const messages = gains.map((cards, id) => (countCards(cards) > 0 ? `${this.players[id].name}: ${formatCards(cards)}` : null)).filter(Boolean);
         this.log(messages.length ? `生産 ${messages.join(' / ')}` : '誰も資源をもらえませんでした');
     }
 
@@ -830,7 +835,7 @@ export default class Game {
         this.queues = this.players.map(() => []);
         this.rolls = this.players.map(() => [1 + Math.floor(this.random() * 6), 1 + Math.floor(this.random() * 6)]);
         this.dice = null;
-        this.log(`第${this.turnNumber}巡。全員がサイコロを振りました（${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}）`);
+        this.log(`出た目 ${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}`);
         this.players.forEach(p => this.emit('roll', { player: p.id, dice: [...this.rolls[p.id]] }));
         const sevens = this.players.filter(p => this.rolls[p.id][0] + this.rolls[p.id][1] === 7);
         // 7 があれば、生産の前に手札を半分捨てる（何人が7を出しても1回）
@@ -839,10 +844,14 @@ export default class Game {
             discarding.forEach(p => this.queues[p.id].push({ type: 'discard', count: Math.floor(countCards(p.hand) / 2) }));
             this.log(`7 が出ました（${sevens.map(p => p.name).join('・')}）。${discarding.length ? `手札が${HAND_LIMIT + 1}枚以上の人は半分を捨てます` : '盗賊を動かします'}`);
         }
+        // 生産は目ごとに配り、ログは1行にまとめる
+        const total = this.players.map(() => emptyCards());
         this.players.forEach(p => {
             const sum = this.rolls[p.id][0] + this.rolls[p.id][1];
-            if (sum !== 7) this.produce(sum);
+            if (sum === 7) return;
+            this.produce(sum, { log: false }).forEach((cards, id) => addCards(total[id], cards));
         });
+        if (sevens.length < this.players.length) this.logProduction(total);
         sevens.forEach(p => this.queues[p.id].push({ type: 'robber' }));
     }
 
@@ -852,7 +861,6 @@ export default class Game {
         if (blocked) return this.reject(blocked);
         if (this.trade?.from === player.id) this.trade = null;
         this.done[player.id] = true;
-        this.log(`${player.name}が完了しました`);
         if (this.done.every(Boolean)) this.startRound();
         return true;
     }
