@@ -1461,6 +1461,33 @@ dialog::backdrop {
     margin-right: 4px;
 }
 
+/* 初期配置の順番（1つ目と2つ目を1行に並べる） */
+.pic-setup {
+    display: flex;
+    align-items: flex-start;
+    margin: 6px 0;
+}
+
+.pic-setup .pic-arrow {
+    margin: 0 3px;
+    line-height: 20px;
+}
+
+/* 組の並びは折り返さない（狭い段でも1行に収める） */
+.pic-round > div:first-child {
+    display: flex;
+    flex-wrap: nowrap;
+}
+
+.pic-setup .pic-pair {
+    margin-right: 2px;
+}
+
+.pic-note {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
 .pic-tag {
     font-size: 0.78rem;
     font-weight: 800;

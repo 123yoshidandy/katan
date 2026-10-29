@@ -109,12 +109,11 @@ const SCENES = {
     ]),
 
     // 初期配置の順番：1つ目は順に、2つ目は逆の順に
+    // 1行に並べて、最後の人（緑）が続けて置くことが見えるようにする
     setup: () => {
         const turn = (owner) => el('span', 'pic-pair', [pieceIcon('settlement', owner), pieceIcon('road', owner)]);
-        return caption([
-            ['1つ目', arrow(), turn(0), turn(1), turn(2)],
-            ['2つ目', arrow(), turn(2), turn(1), turn(0), '（逆の順）']
-        ]);
+        const round = (owners, name) => el('div', 'pic-round', [el('div', '', owners.map(turn)), el('div', 'pic-note', [name])]);
+        return el('div', 'pic-setup', [round([0, 1, 2], '1つ目'), arrow(), round([2, 1, 0], '2つ目（逆の順）')]);
     },
 
     // 銀行・港との交換
