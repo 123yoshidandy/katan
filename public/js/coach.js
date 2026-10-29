@@ -104,8 +104,8 @@ function nextStep(view, hint, { piece, lacking, missingCount, chips, act, mode }
     switch (hint.type) {
         case 'roll': return { parts: ['まずサイコロを振って、資源を集めます'], strong: true };
         case 'build':
-            // 目指すもののほかに、余った材料で建てられる物
-            if (hint.piece !== piece) return act(`材料が余っているので、先に${PIECE_NAMES[hint.piece]}を建てておきます`);
+            // 目指すもののほかに、材料が揃っている物
+            if (hint.piece !== piece) return act(`${PIECE_NAMES[hint.piece]}の材料が揃っているので、先に建てます`);
             return act(`なので、${PIECE_NAMES[hint.piece]}を建てます`);
         case 'bankTrade': {
             const ratio = view.options.tradeRatios[hint.give];

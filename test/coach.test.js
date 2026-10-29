@@ -90,7 +90,7 @@ describe('作戦（状況の説明）', () => {
         expect(action(game, seat)).toMatch(/^余っている\[sheep\]\d枚を、銀行で\[(ore|wheat)\]に換えて、足りない分を減らします★$/);
     });
 
-    it('目指すもののほかに余った材料で建てるときは、先に建てておくと言う（道は木材・レンガが2枚ずつあるとき）', () => {
+    it('目指すもののほかに材料が揃っている物を建てるときは、先に建てると言う（道は木材・レンガが2枚ずつあるとき）', () => {
         let found = 0;
         for (let seed = 1; seed <= 6; seed++) {
             const game = new Game(humans(3), { seed });
@@ -101,7 +101,7 @@ describe('作戦（状況の説明）', () => {
                 const goal = view.options.goal?.piece;
                 if (game.phase === 'play' && command.type === 'build' && goal && command.piece !== goal && !game.pendingOf?.(seat)) {
                     found++;
-                    expect(action(game, seat)).toBe(`材料が余っているので、先に${{ road: '道', settlement: '開拓地', city: '都市' }[command.piece]}を建てておきます★`);
+                    expect(action(game, seat)).toBe(`${{ road: '道', settlement: '開拓地', city: '都市' }[command.piece]}の材料が揃っているので、先に建てます★`);
                     if (command.piece === 'road') {
                         expect(game.players[seat].hand.wood).toBeGreaterThanOrEqual(2);
                         expect(game.players[seat].hand.brick).toBeGreaterThanOrEqual(2);
