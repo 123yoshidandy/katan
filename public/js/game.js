@@ -17,7 +17,7 @@
  *
  * リアルタイムモード（mode: 'realtime'）：待ち時間を減らすため、初期配置のあとは全員が同時に動く
  * - 巡のはじめに、全員が同時にサイコロを振る（自動）。どの人の目でも、全員が資源をもらう
- *   - 7 を出した人がいれば、その巡の生産の前に、手札が8枚以上の人は半分を捨てる（何人が7を出しても1回）
+ *   - 7 を出した人がいれば、その巡の生産のあとで、手札が8枚以上の人は半分を捨てる（何人が7を出しても1回）
  *   - 7 を出した人は、それぞれ盗賊を動かして1枚奪う
  * - 各自が好きな順に、建設・交換・発展カード（1巡に1枚）を行い、「完了」する。同じ場所は早い者勝ち
  * - 交渉は誰でも持ちかけられる（同時に進む交渉は1つまで）
@@ -838,12 +838,6 @@ export default class Game {
         this.log(`サイコロを振りました。${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}`);
         this.players.forEach(p => this.emit('roll', { player: p.id, dice: [...this.rolls[p.id]] }));
         const sevens = this.players.filter(p => this.rolls[p.id][0] + this.rolls[p.id][1] === 7);
-        // 7 があれば、生産の前に手札を半分捨てる（何人が7を出しても1回）
-        if (sevens.length > 0) {
-            const discarding = this.players.filter(p => countCards(p.hand) > HAND_LIMIT);
-            discarding.forEach(p => this.queues[p.id].push({ type: 'discard', count: Math.floor(countCards(p.hand) / 2) }));
-            this.log(`7 が出ました（${sevens.map(p => p.name).join('・')}）。${discarding.length ? `手札が${HAND_LIMIT + 1}枚以上の人は半分を捨てます` : '盗賊を動かします'}`);
-        }
         // 生産は目ごとに配り、ログは1行にまとめる
         const total = this.players.map(() => emptyCards());
         this.players.forEach(p => {
@@ -852,6 +846,13 @@ export default class Game {
             this.produce(sum, { log: false }).forEach((cards, id) => addCards(total[id], cards));
         });
         if (sevens.length < this.players.length) this.logProduction(total);
+        // 7 があれば、この巡の資源を配ったあとの手札で数え、半分を捨てる（何人が7を出しても1回）
+        // 先に数えると、7 の前に手札を減らしておけば、この巡に増えた分は捨てずに済んでしまう
+        if (sevens.length > 0) {
+            const discarding = this.players.filter(p => countCards(p.hand) > HAND_LIMIT);
+            discarding.forEach(p => this.queues[p.id].push({ type: 'discard', count: Math.floor(countCards(p.hand) / 2) }));
+            this.log(`7 が出ました（${sevens.map(p => p.name).join('・')}）。${discarding.length ? `手札が${HAND_LIMIT + 1}枚以上の人は半分を捨てます` : '盗賊を動かします'}`);
+        }
         sevens.forEach(p => this.queues[p.id].push({ type: 'robber' }));
     }
 

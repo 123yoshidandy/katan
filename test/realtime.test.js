@@ -87,7 +87,24 @@ describe('リアルタイムモード', () => {
         expect(game.players[0].hand).toEqual(cards({ wood: 1, brick: 1 }));
     });
 
-    it('7 が出たら、生産の前に手札が8枚以上の人が半分捨て、7を出した人が盗賊を動かす。ほかの人は待たずに動ける', () => {
+    it('7 で捨てるかは、同じ巡に出たほかの目の資源をもらったあとの手札で数える', () => {
+        const game = afterSetup(3, 2);
+        // 1番の建物が接する、数字のあるタイル（盗賊のいないもの）
+        const hexId = game.buildings
+            .flatMap((b, v) => (b?.owner === 1 ? GEOMETRY.vertices[v].hexes : []))
+            .find(id => game.board.hexes[id].number && id !== game.robber);
+        const n = game.board.hexes[hexId].number;
+        game.players[0].hand = cards({});
+        game.players[1].hand = cards({ wood: 7 }); // 7枚。資源をもらう前に数えれば、捨てずに済む
+        game.players[2].hand = cards({});
+        fixDice(game, [[3, 4], [Math.max(1, n - 6), Math.min(6, n - 1)], [3, 4]]); // 0番と2番が7、1番の目で1番に資源が入る
+        [0, 1, 2].forEach(seat => game.applyCommand(seat, { type: 'endTurn' }));
+        const total = countCards(game.players[1].hand);
+        expect(total).toBeGreaterThan(7);
+        expect(game.queues[1]).toEqual([{ type: 'discard', count: Math.floor(total / 2) }]);
+    });
+
+    it('7 が出たら、手札が8枚以上の人が半分捨て、7を出した人が盗賊を動かす。ほかの人は待たずに動ける', () => {
         const game = afterSetup(3, 2);
         game.players[0].hand = cards({ wood: 4, brick: 4 });
         game.players[1].hand = cards({ wood: 1, brick: 1 });
