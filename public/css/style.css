@@ -1424,6 +1424,21 @@ dialog::backdrop {
     grid-template-columns: 116px;
 }
 
+.pic-scene.pic-harbor {
+    width: 80px;
+}
+
+.pic-sea {
+    fill: #2a7fb0;
+}
+
+/* 港の角（建物を置いていないほう） */
+.pic-corner {
+    fill: rgba(255, 246, 200, 0.6);
+    stroke: var(--gold);
+    stroke-width: 3;
+}
+
 .pic-scene.pic-assist {
     width: 100px;
 }

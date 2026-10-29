@@ -1,7 +1,7 @@
 /**
  * 遊び方の図：盤面と同じ部品（タイル・数字の札・建物・道・盗賊）で、小さな場面を描く
  * index.html の [data-pic] の中に描く
- *   場面：resources / production / odds / setup / trade / longest / robber / assist
+ *   場面：resources / production / odds / setup / trade / harbor / longest / robber / assist
  *   文中の図柄：piece:道や建物 / res:資源 / cost:建物（材料の図柄） / dev:発展カード
  */
 
@@ -118,9 +118,16 @@ const SCENES = {
 
     // 4:1・港での交換
     trade: () => caption([
-        [el('span', 'pic-tag', ['いつでも']), ...resources('sheep', 4), arrow(), res('ore')],
-        [harborBadge('any'), ...resources('sheep', 3), arrow(), res('ore')],
-        [harborBadge('sheep'), ...resources('sheep', 2), arrow(), res('ore')]
+        [el('span', 'pic-tag', ['いつでも']), ...resources('sheep', 4), arrow(), res('ore')]
+    ]),
+
+    // 港：海辺の札から線がつながった2つの角。そこに建物があれば有利に換えられる
+    harbor: () => el('div', 'pic-row', [
+        harborScene(),
+        caption([
+            [harborBadge('any'), ...resources('sheep', 3), arrow(), res('ore'), 'どの資源でも'],
+            [harborBadge('sheep'), ...resources('sheep', 2), arrow(), res('ore'), '描かれた資源だけ']
+        ])
     ]),
 
     // 5本つながった道（枝分かれの道は数えない）
@@ -164,6 +171,28 @@ const SCENES = {
         ])
     ])
 };
+
+// 港の場面：海辺のタイルの辺の外に札を置き、辺の両端の角へ線を引く（盤面の renderHarbor と同じ形）
+// 線の先の2つの角が港。上の角に開拓地を置き、もう1つの角は金色の輪で示す
+function harborScene() {
+    const a = corner(0, 0, 5);
+    const b = corner(0, 0, 0);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const length = Math.hypot(mid.x, mid.y);
+    const badge = { x: mid.x + mid.x / length * HEX_SIZE * 0.62, y: mid.y + mid.y / length * HEX_SIZE * 0.62 };
+    const harbor = svg('g', { class: 'harbor' }, [
+        ...[a, b].map(p => svg('line', { class: 'pier', x1: p.x, y1: p.y, x2: badge.x, y2: badge.y })),
+        svg('circle', { class: 'harbor-badge', cx: badge.x, cy: badge.y, r: 17 }),
+        label(badge.x, badge.y + 1, '3:1', '')
+    ]);
+    return scene('-76 -100 144 166', [
+        svg('rect', { class: 'pic-sea', x: -76, y: -100, width: 144, height: 166, rx: 10 }),
+        harbor,
+        tile(0, 0, null),
+        svg('circle', { class: 'pic-corner', cx: a.x, cy: a.y, r: 8 }),
+        building(b, 'settlement', ME)
+    ], 'pic-scene pic-harbor');
+}
 
 // 盤面のアシストの印：光る数字・場所の数字・★
 function assistScene() {
