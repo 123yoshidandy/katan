@@ -1269,20 +1269,20 @@ dialog::backdrop {
 
 .pic-scene {
     display: block;
-    width: 84px;
+    width: 64px;
     height: auto;
     flex: none;
 }
 
 .pic-scene.pic-mid {
-    width: 150px;
+    width: 120px;
     max-width: 100%;
     margin: 4px auto;
 }
 
 .pic-scene.pic-wide {
     width: 100%;
-    max-width: 260px;
+    max-width: 200px;
 }
 
 .pic-label {
@@ -1300,23 +1300,13 @@ dialog::backdrop {
     stroke-linecap: round;
 }
 
-.pic-tiles {
+/* 図柄と資源の名前を並べる */
+.pic-names {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 6px;
-    margin: 6px 0;
-}
-
-.pic-tiles figure {
-    margin: 0;
-    width: 40px;
-    text-align: center;
-    font-size: 0.78rem;
-}
-
-.pic-tiles .pic-scene {
-    width: 32px;
-    margin: 0 auto 2px;
+    gap: 2px 12px;
+    margin: 4px 0;
+    font-size: 0.9rem;
 }
 
 .pic-row {
@@ -1377,7 +1367,7 @@ dialog::backdrop {
 
 .pic-odds {
     margin: 6px 0;
-    max-width: 260px;
+    max-width: 200px;
 }
 
 .pic-odds-note {

@@ -30,10 +30,11 @@ function el(tag, className, children = []) {
 // 盤面の一部を描く SVG
 const scene = (viewBox, children, className = 'pic-scene') => svg('svg', { class: className, viewBox, 'aria-hidden': 'true' }, children);
 
-// タイル（数字があれば、盤面と同じく図柄を上に寄せて札を置く）
+// タイル（数字があれば、盤面と同じく図柄を上に寄せて札を置く。terrain が null なら、図柄のない薄いタイル）
 function tile(x, y, terrain, number = null) {
     const group = svg('g');
-    group.append(svg('polygon', { class: 'hex-tile', points: hexPoints(x, y, HEX_SIZE - 1.5), fill: TERRAIN_COLORS[terrain] }));
+    group.append(svg('polygon', { class: 'hex-tile', points: hexPoints(x, y, HEX_SIZE - 1.5), fill: terrain ? TERRAIN_COLORS[terrain] : '#e9dfc4' }));
+    if (!terrain) return group;
     if (number) {
         group.append(svg('use', { href: `#sym-${terrain}`, x: x - 17, y: y - 47, width: 34, height: 34 }));
         group.append(numberToken(x, y + 8, number));
@@ -85,11 +86,11 @@ function harborBadge(type) {
 }
 
 const SCENES = {
-    // 資源の出るタイル
-    resources: () => el('div', 'pic-tiles', [...RESOURCES, 'desert'].map(terrain => el('figure', '', [
-        scene('-54 -62 108 124', [tile(0, 0, terrain)]),
-        el('figcaption', '', [terrain === 'desert' ? 'なし' : RESOURCE_NAMES[terrain]])
-    ]))),
+    // タイルの図柄と、出る資源
+    resources: () => el('div', 'pic-names', [
+        ...RESOURCES.map(r => el('span', '', [res(r), RESOURCE_NAMES[r]])),
+        el('span', '', [res('desert'), '砂漠（何も出ない）'])
+    ]),
 
     // 8 が出ると、開拓地は1枚・都市は2枚もらえる
     production: () => el('div', 'pic-row', [
@@ -135,7 +136,7 @@ const SCENES = {
             // 道の外側（上か右）に番号を置く
             return label(i === 4 ? mid.x + 18 : mid.x, i === 4 ? mid.y : mid.y - 18, String(i + 1));
         });
-        return scene('-122 -86 258 156', [tile(left.x, 0, 'wood'), tile(right.x, 0, 'wheat'), ...roads, building(path[0], 'settlement', ME), ...numbers], 'pic-scene pic-mid');
+        return scene('-122 -86 258 156', [tile(left.x, 0, null), tile(right.x, 0, null), ...roads, building(path[0], 'settlement', ME), ...numbers], 'pic-scene pic-mid');
     },
 
     // 盗賊のいるタイル：資源が出ず、そこに建物を持つ人から1枚奪う
@@ -148,7 +149,7 @@ const SCENES = {
             building(corner(0, 0, 4), 'settlement', OTHER)
         ]),
         caption([
-            [robberIcon(), 'のタイルは、6 が出ても資源が出ない'],
+            [robberIcon(), 'のタイルは、資源が出ない'],
             [pieceIcon('settlement', OTHER), 'の人から、1枚奪う']
         ])
     ])
