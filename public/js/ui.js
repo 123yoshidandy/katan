@@ -1056,7 +1056,10 @@ export default class UI {
                 }
             });
             button.append(resourceIcon(r), element('span', { className: 'count', text: `${ratios[r]}:1` }));
-            return button;
+            // 交渉の欄と同じく、下に手持ちの枚数を出す
+            const cell = element('div', { className: 'pick' });
+            cell.append(button, element('span', { className: 'owned', text: `手持ち ${me.hand[r]}` }));
+            return cell;
         }));
         const getRow = $('bank-get');
         getRow.replaceChildren(...RESOURCES.map(r => {
