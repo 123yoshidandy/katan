@@ -18,6 +18,8 @@ import { RESOURCES, DEV_NAMES } from './game.js';
 const FLIGHT_MS = 560;   // カードが飛ぶ時間
 const THROW_MS = 700;    // サイコロを投げてから止まるまで
 const DICE_HOLD_MS = 600; // 止まったサイコロを中央に見せておく時間
+const DICE_PAIR_GAP = 96; // 同時に振ったとき、横に並ぶ2個1組どうしの間隔（2個で幅74pxほど）
+const DICE_ROW_GAP = 64;  // 同時に振ったとき、奥の列と手前（自分）の列の間隔
 const DROP_MS = 380;     // 建物が落ちる時間
 const ROBBER_MS = 480;   // 盗賊が跳ぶ時間
 const STAGGER_MS = 70;   // 何枚も飛ぶときの間隔
@@ -46,14 +48,22 @@ export function playAnimations(previous, view, refs) {
     const now = performance.now();
     // 前の演出が続いていれば、そのあとに続ける
     let t = Math.min(Math.max(0, busyUntil - now), MAX_WAIT_MS);
-    // 続けて届いたサイコロ（リアルタイムモードで全員が同時に振ったもの）は、同時に投げ込む
+    // 続けて届いたサイコロ（リアルタイムモードで全員が同時に振ったもの）は、同時に、重ならない位置へ投げ込む
+    const rollGroups = new Map(); // roll イベント → 一緒に振った人の席の一覧
+    let group = null;
+    events.forEach(event => {
+        if (event.type !== 'roll') { group = null; return; }
+        group ??= [];
+        group.push(event.player);
+        rollGroups.set(event, group);
+    });
     let rollStart = null;
     events.forEach(event => {
         const play = PLAYERS[event.type];
         if (!play) return;
         if (event.type === 'roll') {
             rollStart ??= t;
-            t = Math.max(t, play(stage, event, rollStart));
+            t = Math.max(t, play(stage, event, rollStart, rollGroups.get(event)));
         } else {
             rollStart = null;
             t = play(stage, event, t);
@@ -93,8 +103,8 @@ function attach(entry) {
 // ===== イベントごとの演出（始める時刻 t を受け取り、次の演出を始める時刻を返す） =====
 
 const PLAYERS = {
-    roll(stage, { player, dice }, t) {
-        stage.throwDice(player, dice, t);
+    roll(stage, { player, dice }, t, group) {
+        stage.throwDice(player, dice, t, group);
         // 資源が飛ぶのは、サイコロが止まってから
         return t + THROW_MS;
     },
@@ -278,7 +288,8 @@ function createStage(view, refs) {
         // 振った人の色のサイコロを、盤面の中央へ投げ込む
         // 自分：手前（盤面の下）から、大きく見えている状態から奥へ遠ざかるように小さくなりながら
         // ほかの人：奥（盤面の上）から、小さい状態から近づくように大きくなりながら。奥のどこから来るかは人ごとに変える
-        throwDice(player, values, delay) {
+        // group：同時に振った人の席の一覧。2人以上なら、自分は中央の少し手前、ほかの人は少し奥に札と同じ順で並べて止める
+        throwDice(player, values, delay, group = [player]) {
             const rect = board.getBoundingClientRect();
             if (!rect.width || !values) return;
             const mine = isMe(player);
@@ -292,6 +303,17 @@ function createStage(view, refs) {
                 ? { x: rect.left + rect.width * 0.5, y: rect.bottom + 30 }
                 : { x: fromTile ? tileX : rect.left + rect.width * (0.25 + 0.5 * lane), y: rect.top - 30 };
             const end = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            if (group.length > 1) {
+                const meInGroup = group.some(isMe);
+                const row = others.filter(id => group.includes(id)); // 奥の列（札の並び順）
+                const gap = Math.min(DICE_PAIR_GAP, rect.width * 0.9 / Math.max(1, row.length));
+                if (mine) {
+                    end.y += DICE_ROW_GAP / 2;
+                } else {
+                    end.x += (row.indexOf(player) - (row.length - 1) / 2) * gap;
+                    if (meInGroup) end.y -= DICE_ROW_GAP / 2;
+                }
+            }
             const total = THROW_MS + DICE_HOLD_MS;
             const landed = THROW_MS / total;
             values.forEach((value, i) => {
