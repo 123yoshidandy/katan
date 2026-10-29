@@ -74,7 +74,7 @@ const arrow = () => el('span', 'pic-arrow', ['→']);
 // 図の横に並べる説明の行
 const caption = (lines) => el('div', 'pic-caption', lines.map(parts => el('div', '', parts)));
 
-// 港の札（盤面と同じ形）
+// 港の丸い印（盤面と同じ形）
 function harborBadge(type) {
     const children = [svg('circle', { class: 'harbor-badge', cx: 0, cy: 0, r: 17 })];
     if (type === 'any') children.push(label(0, 1, '3:1', ''));
@@ -121,7 +121,7 @@ const SCENES = {
         [el('span', 'pic-tag', ['いつでも']), ...resources('sheep', 4), arrow(), res('ore')]
     ]),
 
-    // 港：海辺の札から線がつながった2つの角。そこに建物があれば有利に換えられる
+    // 港：海の丸い印から線が伸びている2つの角。そこに建物があれば有利に換えられる
     harbor: () => el('div', 'pic-row', [
         harborScene(),
         caption([
@@ -172,7 +172,7 @@ const SCENES = {
     ])
 };
 
-// 港の場面：海辺のタイルの辺の外に札を置き、辺の両端の角へ線を引く（盤面の renderHarbor と同じ形）
+// 港の場面：海辺のタイルの辺の外に丸い印を置き、辺の両端の角へ線を引く（盤面の renderHarbor と同じ形）
 // 線の先の2つの角が港。上の角に開拓地を置き、もう1つの角は金色の輪で示す
 function harborScene() {
     const a = corner(0, 0, 5);
