@@ -491,17 +491,38 @@ export default class Game {
             this.log(`${player.name}が盗賊を動かしました`);
             return true;
         }
+        this.steal(player, victim, `${player.name}が盗賊を動かし、`);
+        return true;
+    }
+
+    // リアルタイムモードの 7：盗賊を（何人が7を出しても1回だけ）ランダムなタイルに動かし、7を出した人はそれぞれ、そこに建物を持つ人から1枚奪う
+    // 7を出した人に選ばせると、何人も出たときに、あとから動かした人の場所だけが残ってしまうため
+    moveRobberAtRandom(sevens) {
+        const hexes = this.board.hexes.map((hex, id) => id).filter(id => id !== this.robber && this.board.hexes[id].terrain !== 'desert');
+        const hex = hexes[Math.floor(this.random() * hexes.length)];
+        this.emit('robber', { player: null, from: this.robber, to: hex });
+        this.robber = hex;
+        this.log('盗賊がランダムなタイルに動きました');
+        sevens.forEach(player => {
+            const victims = this.robberVictims(player.id, hex);
+            if (victims.length === 0) return;
+            this.steal(player, victims[Math.floor(this.random() * victims.length)], `${player.name}が`);
+        });
+    }
+
+    // player が victim から1枚ランダムに奪う（prefix はログの頭に付ける「〜が」までの文）
+    steal(player, victim, prefix) {
         const target = this.players[victim];
         const cards = RESOURCES.flatMap(r => Array(target.hand[r]).fill(r));
         const stolen = cards[Math.floor(this.random() * cards.length)];
         target.hand[stolen]--;
         player.hand[stolen]++;
+        this.trimDiscards();
         this.emit('steal', { from: victim, to: player.id, resource: stolen });
-        this.log(`${player.name}が盗賊を動かし、${target.name}から1枚奪いました`, {
+        this.log(`${prefix}${target.name}から1枚奪いました`, {
             seats: [player.id, victim],
-            text: `${player.name}が盗賊を動かし、${target.name}から${RESOURCE_NAMES[stolen]}を奪いました`
+            text: `${prefix}${target.name}から${RESOURCE_NAMES[stolen]}を奪いました`
         });
-        return true;
     }
 
     // ===== 発展カード =====
@@ -566,6 +587,7 @@ export default class Game {
                 p.hand[resource] = 0;
             });
             player.hand[resource] += total;
+            this.trimDiscards();
             this.emit('playDev', { player: player.id, card });
             this.emit('monopoly', { player: player.id, resource, taken });
             this.log(`${player.name}が独占を使い、${RESOURCE_NAMES[resource]}を${total}枚集めました`);
@@ -804,6 +826,17 @@ export default class Game {
         return seat === this.currentPlayerIndex ? this.pending : null;
     }
 
+    // リアルタイムモードで、捨てるのを待つ間に手札が減ったら（ほかの人の独占・盗賊）、捨てる枚数を手札までにする
+    trimDiscards() {
+        if (this.mode !== 'realtime' || this.phase !== 'play') return;
+        this.players.forEach(p => {
+            const head = this.queues[p.id][0];
+            if (head?.type !== 'discard') return;
+            head.count = Math.min(head.count, countCards(p.hand));
+            if (head.count === 0) this.queues[p.id].shift();
+        });
+    }
+
     setPending(seat, pending) {
         if (this.mode === 'realtime' && this.phase === 'play') this.queues[seat].unshift(pending);
         else this.pending = pending;
@@ -851,9 +884,9 @@ export default class Game {
         if (sevens.length > 0) {
             const discarding = this.players.filter(p => countCards(p.hand) > HAND_LIMIT);
             discarding.forEach(p => this.queues[p.id].push({ type: 'discard', count: Math.floor(countCards(p.hand) / 2) }));
-            this.log(`7 が出ました（${sevens.map(p => p.name).join('・')}）。${discarding.length ? `手札が${HAND_LIMIT + 1}枚以上の人は半分を捨てます` : '盗賊を動かします'}`);
+            this.log(`7 が出ました（${sevens.map(p => p.name).join('・')}）${discarding.length ? `。手札が${HAND_LIMIT + 1}枚以上の人は半分を捨てます` : ''}`);
+            this.moveRobberAtRandom(sevens);
         }
-        sevens.forEach(p => this.queues[p.id].push({ type: 'robber' }));
     }
 
     // seat の人がこの巡を完了する。全員が完了したら次の巡へ

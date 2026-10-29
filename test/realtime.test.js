@@ -18,10 +18,10 @@ function afterSetup(n = 3, seed = 1) {
     return game;
 }
 
-// 次の巡のサイコロの目を決める（[[d1, d2], ...] を席の順に）
+// 次の巡のサイコロの目を決める（[[d1, d2], ...] を席の順に）。そのあとの乱数（盗賊の行き先など）は 0.5
 function fixDice(game, dice) {
     const values = dice.flat().map(d => (d - 1) / 6 + 0.01);
-    game.random = () => values.shift();
+    game.random = () => (values.length ? values.shift() : 0.5);
 }
 
 describe('リアルタイムモード', () => {
@@ -104,28 +104,60 @@ describe('リアルタイムモード', () => {
         expect(game.queues[1]).toEqual([{ type: 'discard', count: Math.floor(total / 2) }]);
     });
 
-    it('7 が出たら、手札が8枚以上の人が半分捨て、7を出した人が盗賊を動かす。ほかの人は待たずに動ける', () => {
+    it('7 が出たら、手札が8枚以上の人が半分捨て、盗賊はランダムなタイルに動く。ほかの人は待たずに動ける', () => {
         const game = afterSetup(3, 2);
+        const robber = game.robber;
         game.players[0].hand = cards({ wood: 4, brick: 4 });
         game.players[1].hand = cards({ wood: 1, brick: 1 });
         game.players[2].hand = cards({ ore: 9 });
         fixDice(game, [[3, 4], [1, 1], [1, 1]]); // 0番が7
         [0, 1, 2].forEach(seat => game.applyCommand(seat, { type: 'endTurn' }));
-        expect(game.queues[0].map(q => q.type)).toEqual(['discard', 'robber']);
-        expect(game.queues[2]).toEqual([{ type: 'discard', count: 4 }]);
+        expect(game.robber).not.toBe(robber);
+        expect(game.board.hexes[game.robber].terrain).not.toBe('desert');
+        // 7を出した人も、盗賊は動かさない。捨てる人だけが待つ
+        expect(game.queues[0].map(q => q.type)).toEqual(['discard']);
+        expect(game.queues[2].map(q => q.type)).toEqual(['discard']);
         expect(game.queues[1]).toEqual([]);
-        // 7を出した人は、先に捨てて盗賊を動かすまで建てられない
+        // 捨てるまでは建てられない。ほかの人は待たずに動ける
         expect(game.applyCommand(0, { type: 'endTurn' })).toBe(false);
-        // ほかの人は待たずに動ける
         const edge = game.roadSpots(1)[0];
         expect(game.applyCommand(1, { type: 'build', piece: 'road', at: edge })).toBe(true);
-        expect(game.applyCommand(0, { type: 'discard', cards: { wood: 4 } })).toBe(true);
-        const hex = GEOMETRY.hexes.map(h => h.id).find(id => id !== game.robber && game.robberVictims(0, id).length === 0);
-        expect(game.applyCommand(0, { type: 'moveRobber', hex, victim: null })).toBe(true);
-        expect(game.robber).toBe(hex);
+        const { count } = game.queues[0][0];
+        const hand = game.players[0].hand;
+        const discard = hand.wood >= count ? { wood: count } : { wood: hand.wood, brick: count - hand.wood };
+        expect(game.applyCommand(0, { type: 'discard', cards: discard })).toBe(true);
         expect(game.applyCommand(0, { type: 'endTurn' })).toBe(true);
         // 捨てていない人がいると、その人は完了できない
         expect(game.applyCommand(2, { type: 'endTurn' })).toBe(false);
+    });
+
+    it('何人が7を出しても盗賊は1回だけ動き、7を出した人はそれぞれ、そのタイルに建物を持つ人から1枚奪う', () => {
+        const game = afterSetup(3, 2);
+        game.players.forEach(p => { p.hand = cards({ sheep: 2 }); });
+        fixDice(game, [[3, 4], [2, 5], [1, 1]]); // 0番と1番が7
+        const since = game.eventSerial;
+        [0, 1, 2].forEach(seat => game.applyCommand(seat, { type: 'endTurn' }));
+        const events = game.events.filter(e => e.id > since);
+        expect(events.filter(e => e.type === 'robber')).toHaveLength(1);
+        const steals = events.filter(e => e.type === 'steal');
+        // この盤面では、0番も1番も、盗賊のタイルに建物を持つ人から1枚ずつ奪う
+        expect(steals.map(e => e.to)).toEqual([0, 1]);
+        const owners = GEOMETRY.hexes[game.robber].vertices.map(v => game.buildings[v]?.owner);
+        steals.forEach(e => {
+            expect(e.from).not.toBe(e.to);
+            expect(owners).toContain(e.from);
+        });
+    });
+
+    it('捨てるのを待つ間に、ほかの人の独占で手札が減ったら、捨てる枚数は手札までになる', () => {
+        const game = afterSetup(2);
+        game.players[0].hand = cards({ sheep: 6, ore: 2 });
+        game.queues[0] = [{ type: 'discard', count: 4 }];
+        game.players[1].devCards = [{ type: 'monopoly', turn: 0 }];
+        expect(game.applyCommand(1, { type: 'playDev', card: 'monopoly', resource: 'sheep' })).toBe(true);
+        expect(game.queues[0]).toEqual([{ type: 'discard', count: 2 }]);
+        expect(game.applyCommand(0, { type: 'discard', cards: { ore: 2 } })).toBe(true);
+        expect(game.queues[0]).toEqual([]);
     });
 
     it('発展カードは1巡に1枚。買った巡には使えない', () => {
