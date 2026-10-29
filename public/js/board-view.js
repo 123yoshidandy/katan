@@ -174,7 +174,7 @@ export function renderBoard(root, state, options = {}) {
     stars.forEach(({ x, y }) => root.append(svg('polygon', { class: 'best-star', points: starPoints(x, y, 11) })));
 }
 
-const starPoints = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => {
+export const starPoints = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => {
     const radius = i % 2 === 0 ? r : r * 0.45;
     const angle = Math.PI / 5 * i - Math.PI / 2;
     return `${(cx + radius * Math.cos(angle)).toFixed(1)},${(cy + radius * Math.sin(angle)).toFixed(1)}`;

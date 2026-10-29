@@ -1,12 +1,12 @@
 /**
  * 遊び方の図：盤面と同じ部品（タイル・数字の札・建物・道・盗賊）で、小さな場面を描く
  * index.html の [data-pic] の中に描く
- *   場面：resources / production / odds / setup / trade / longest / robber
+ *   場面：resources / production / odds / setup / trade / longest / robber / assist
  *   文中の図柄：piece:道や建物 / res:資源 / cost:建物（材料の図柄） / dev:発展カード
  */
 
 import {
-    svg, hexPoints, numberToken, robberPiece, resourceIcon, pieceIcon,
+    svg, hexPoints, numberToken, robberPiece, starPoints, resourceIcon, pieceIcon,
     BUILDING_PATHS, TERRAIN_COLORS, PLAYER_COLORS, HEX_SIZE
 } from './board-view.js';
 import { RESOURCES, RESOURCE_NAMES, COSTS } from './game.js';
@@ -31,13 +31,13 @@ function el(tag, className, children = []) {
 const scene = (viewBox, children, className = 'pic-scene') => svg('svg', { class: className, viewBox, 'aria-hidden': 'true' }, children);
 
 // タイル（数字があれば、盤面と同じく図柄を上に寄せて札を置く。terrain が null なら、図柄のない薄いタイル）
-function tile(x, y, terrain, number = null) {
+function tile(x, y, terrain, number = null, rolled = false) {
     const group = svg('g');
     group.append(svg('polygon', { class: 'hex-tile', points: hexPoints(x, y, HEX_SIZE - 1.5), fill: terrain ? TERRAIN_COLORS[terrain] : '#e9dfc4' }));
     if (!terrain) return group;
     if (number) {
         group.append(svg('use', { href: `#sym-${terrain}`, x: x - 17, y: y - 47, width: 34, height: 34 }));
-        group.append(numberToken(x, y + 8, number));
+        group.append(numberToken(x, y + 8, number, rolled));
     } else {
         group.append(svg('use', { href: `#sym-${terrain}`, x: x - 24, y: y - 24, width: 48, height: 48 }));
     }
@@ -140,6 +140,15 @@ const SCENES = {
     },
 
     // 盗賊のいるタイル：資源が出ず、そこに建物を持つ人から1枚奪う
+    assist: () => el('div', 'pic-row', [
+        assistScene(),
+        caption([
+            [el('strong', '', ['光る数字']), '：サイコロで出た目のタイル。角の建物が資源をもらう'],
+            [el('strong', '', ['場所の数字']), '：開拓地を置ける場所の、周りのタイルの出やすさの合計。大きいほどよく出る'],
+            [el('span', 'pic-star', ['★']), '：おすすめの場所']
+        ])
+    ]),
+
     robber: () => el('div', 'pic-row', [
         scene('-72 -72 144 144', [
             tile(0, 0, 'wheat', 6),
@@ -154,6 +163,21 @@ const SCENES = {
         ])
     ])
 };
+
+// 盤面のアシストの印：光る数字・場所の数字・★
+function assistScene() {
+    const spot = (point, text, best = false) => {
+        const group = svg('g', { class: `spot spot-vertex${best ? ' best' : ''}` }, [svg('circle', { class: 'spot-mark', cx: point.x, cy: point.y, r: 11 })]);
+        if (text) group.append(label(point.x, point.y + 1, text, 'spot-label'));
+        if (best) group.append(svg('polygon', { class: 'best-star', points: starPoints(point.x + 13, point.y - 13, 11) }));
+        return group;
+    };
+    return scene('-72 -76 150 148', [
+        tile(0, 0, 'wheat', 6, true),
+        spot(corner(0, 0, 5), '11'),
+        spot(corner(0, 0, 1), '13', true)
+    ], 'pic-scene pic-assist');
+}
 
 // 文中の小さな図柄
 const DEV_ICONS = {

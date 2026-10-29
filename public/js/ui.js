@@ -118,6 +118,7 @@ export default class UI {
         this.autoRejectedTrade = null; // 自動で断った交渉の番号（同じ交渉に何度も送らない）
         injectSymbols();
         renderHelpPictures($('help-dialog'));
+        this.renderHelpSamples();
         this.bindEvents();
         this.renderTitleArt();
         this.renderSoundButtons();
@@ -794,6 +795,39 @@ export default class UI {
         opponents.style.setProperty('--count', String(others.length));
         $('me-row').replaceChildren(...(me ? [this.playerRow(view, me)] : []));
         $('me-row').classList.toggle('hidden', !me);
+    }
+
+    // 遊び方の「画面」のタブ：ゲーム画面と同じ部品に例の値を入れて、見本を描く
+    renderHelpSamples() {
+        const players = [
+            { id: 0, name: 'あなた', cardCount: 5, devCardCount: 1, knights: 1, roadLength: 6, points: 6 },
+            { id: 1, name: 'CPU1', cardCount: 3, devCardCount: 0, knights: 3, roadLength: 4, points: 5 }
+        ];
+        // あなたが最長交易路、CPU1 が最大騎士力を持っている
+        const view = { players, me: players[0], currentPlayerId: 0, phase: 'play', realtime: false, done: [], longestRoad: 0, largestArmy: 1 };
+        const fill = (name, node) => document.querySelector(`#help-dialog [data-sample="${name}"]`).replaceChildren(node);
+        fill('me', this.playerRow(view, players[0]));
+        fill('tile', this.playerRow(view, players[1], { tile: true }));
+        // 説明の欄（足りない資源の図柄は薄く、今することは青い太字）
+        const icon = (r, lack = false) => {
+            const node = resourceIcon(r, 'mini-icon');
+            if (lack) node.classList.add('lack');
+            return node;
+        };
+        const chip = (n) => element('span', { className: 'coach-num', text: String(n) });
+        fill('coach', element('div', { className: 'coach' }, [element('p', { className: 'coach-text' }, [
+            element('span', { text: '開拓地を建てると1点増え、資源も増えます。' }),
+            element('span', {}, [icon('wood'), icon('brick'), icon('sheep', true), icon('wheat', true), 'のうち、羊毛と小麦があと2枚足りません。']),
+            element('span', { className: 'coach-act' }, [chip(5), chip(9), 'で出るので、手番を終えて待ちます', element('span', { className: 'coach-star', text: '★' })])
+        ])]));
+        // 建設のボタン（羊毛と小麦が足りない。★はおすすめ）
+        const cost = cardsLine(COSTS.settlement);
+        cost.classList.add('cost');
+        [2, 3].forEach(i => cost.children[i].classList.add('lack'));
+        const button = element('button', { className: 'recommended' }, [element('span', { className: 'label' }, [pieceIcon('settlement', 0), PIECE_NAMES.settlement]), cost]);
+        button.type = 'button';
+        button.tabIndex = -1;
+        fill('button', element('div', { className: 'actions' }, [button]));
     }
 
     // プレイヤーの欄。tile：相手の札（1段目に名前と点数、その下に手札・発展・騎士・道）

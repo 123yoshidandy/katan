@@ -1300,6 +1300,67 @@ dialog::backdrop {
     stroke-linecap: round;
 }
 
+/* 画面のタブの見本：ゲーム画面と同じ部品を、海の色の上に置く */
+.help-body h4 {
+    margin: 8px 0 2px;
+    font-size: 0.88rem;
+}
+
+.ui-sample {
+    background: var(--sea);
+    border-radius: 10px;
+    padding: 8px;
+    margin: 4px 0;
+}
+
+.ui-sample.tile-sample {
+    width: 166px;
+}
+
+/* 見本の中の図柄は、ゲーム画面と同じ大きさにする（上の .help-body の指定を打ち消す） */
+.help-body .ui-sample .piece-icon {
+    width: 16px;
+    height: 14px;
+    margin-right: 0;
+    vertical-align: middle;
+}
+
+.help-body .ui-sample .coach-text .mini-icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+}
+
+.help-body .ui-sample .actions button .cost .mini-icon {
+    width: 11px;
+    height: 11px;
+    vertical-align: baseline;
+}
+
+/* 説明の欄は、高さを中身に合わせ、文字はゲーム画面と同じ大きさにする */
+.ui-sample .coach {
+    height: auto;
+    min-height: 66px;
+}
+
+.help-body .ui-sample .coach-text {
+    font-size: inherit;
+    line-height: inherit;
+    margin: 0;
+}
+
+.ui-sample.button-sample {
+    width: fit-content;
+}
+
+.button-sample .actions {
+    grid-template-columns: 116px;
+}
+
+.pic-scene.pic-assist {
+    width: 100px;
+}
+
 /* 図柄と資源の名前を並べる */
 .pic-names {
     display: flex;
