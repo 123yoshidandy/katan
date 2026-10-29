@@ -18,7 +18,10 @@ const isControlledByCpu = (player) => player.isCPU || player.proxy;
 
 // 操作が必要な CPU の席（いなければ null）
 export function cpuActor(game) {
-    const actor = game.actors().find(id => {
+    // リアルタイムモードでは、CPU が交互に動くよう、記録の長さで順番をずらす
+    const actors = game.actors();
+    const shift = game.isRealtimePlay() && actors.length ? game.commands.length % actors.length : 0;
+    const actor = [...actors.slice(shift), ...actors.slice(0, shift)].find(id => {
         const player = game.players[id];
         // 交渉中の手番の人は、相手の返事を待つ（自分から交渉する CPU はいない）
         if (game.trade && id === game.trade.from) return false;
@@ -36,20 +39,21 @@ export function runCpuStep(game) {
     const command = chooseCommand(game, seat);
     if (game.applyCommand(seat, command)) return true;
     // 考えた手が通らなかったら、手番を進めて止まらないようにする
-    if (seat === game.currentPlayerIndex && game.applyCommand(seat, { type: 'endTurn' })) return true;
+    if ((game.isRealtimePlay() || seat === game.currentPlayerIndex) && game.applyCommand(seat, { type: 'endTurn' })) return true;
     throw new Error(`CPU の手を決められませんでした: ${JSON.stringify(command)} ${game.lastError}`);
 }
 
 export function chooseCommand(game, seat) {
-    if (game.pending?.type === 'discard' && game.pending.remaining[seat]) {
-        return { type: 'discard', cards: chooseDiscard(game, seat, game.pending.remaining[seat]) };
+    const pending = game.pendingOf(seat);
+    if (pending?.type === 'discard') {
+        return { type: 'discard', cards: chooseDiscard(game, seat, pending.remaining[seat]) };
     }
-    if (game.trade && seat !== game.trade.from) {
+    if (game.trade && seat !== game.trade.from && !game.trade.responses[seat]) {
         return { type: 'respondTrade', id: game.trade.id, accept: wantsTrade(game, seat) };
     }
     if (game.phase === 'setup') return chooseSetup(game, seat);
-    if (game.pending?.type === 'robber') return chooseRobber(game, seat);
-    if (game.pending?.type === 'roadBuilding') return { type: 'build', piece: 'road', at: chooseRoad(game, seat) };
+    if (pending?.type === 'robber') return chooseRobber(game, seat);
+    if (pending?.type === 'roadBuilding') return { type: 'build', piece: 'road', at: chooseRoad(game, seat) };
     return chooseTurn(game, seat);
 }
 
@@ -60,7 +64,8 @@ export function suggest(game, seat) {
     // 交渉を持ちかけている間は、返事を見て相手を選ぶ（おすすめはしない）
     if (game.trade && seat === game.trade.from) return null;
     const command = chooseCommand(game, seat);
-    const goal = game.phase === 'play' && !game.pending && !game.trade && seat === game.currentPlayerIndex ? buildGoal(game, seat) : null;
+    const acting = game.isRealtimePlay() ? !game.done[seat] && !game.pendingOf(seat) : !game.pending && !game.trade && seat === game.currentPlayerIndex;
+    const goal = game.phase === 'play' && acting ? buildGoal(game, seat) : null;
     return { command, goal };
 }
 

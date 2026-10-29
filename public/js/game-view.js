@@ -28,6 +28,7 @@ export function createGameView(game, viewerId) {
     const isViewer = (id) => id === viewerId;
     const view = {
         viewerId,
+        mode: game.mode,
         phase: game.phase,
         currentPlayerId: game.currentPlayerIndex,
         turnNumber: game.turnNumber,
@@ -42,6 +43,9 @@ export function createGameView(game, viewerId) {
         dice: game.dice ? [...game.dice] : null,
         devPlayed: game.devPlayed,
         pending: game.pending ? JSON.parse(JSON.stringify(game.pending)) : null,
+        // リアルタイムモード：全員の出た目と、完了したか
+        rolls: game.rolls.map(r => (r ? [...r] : null)),
+        done: [...game.done],
         trade: game.trade ? JSON.parse(JSON.stringify(game.trade)) : null,
         longestRoad: game.longestRoad,
         largestArmy: game.largestArmy,
@@ -70,6 +74,12 @@ export function createGameView(game, viewerId) {
         logs: game.logs.slice(-VIEW_LOGS).map(entry => (entry.secret?.seats.includes(viewerId) ? entry.secret.text : entry.text)),
         result: game.result ? { ...game.result, points: [...game.result.points] } : null
     };
+    if (game.isRealtimePlay()) {
+        // 先に片付ける処理は、見ている人のもの。サイコロは見ている人の目
+        const mine = viewerId !== null && viewerId !== undefined;
+        view.pending = mine ? JSON.parse(JSON.stringify(game.pendingOf(viewerId))) : null;
+        view.dice = mine && game.rolls[viewerId] ? [...game.rolls[viewerId]] : null;
+    }
     if (viewerId !== null && viewerId !== undefined && game.phase !== 'end') {
         // 自分が今できること（画面のボタンと候補の表示に使う）
         view.options = {
@@ -94,11 +104,14 @@ export function hydrateGameView(view) {
     const playing = view.phase !== 'end';
     const discardCount = me && view.pending?.type === 'discard' ? (view.pending.remaining[me.id] ?? 0) : 0;
     const tradeWaiting = Boolean(me && view.trade && view.trade.from !== me.id && !view.trade.responses[me.id]);
+    // リアルタイムモードの初期配置のあとは、完了するまでが自分の番
+    const realtime = view.mode === 'realtime' && view.phase === 'play';
     return {
         ...view,
         me,
         current,
-        isMyTurn: Boolean(me) && me === current && playing,
+        realtime,
+        isMyTurn: realtime ? Boolean(me) && !view.done[me.id] : Boolean(me) && me === current && playing,
         discardCount,
         tradeWaiting
     };

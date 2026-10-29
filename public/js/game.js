@@ -14,6 +14,14 @@
  * - 交換: 銀行と 4:1（港があれば 3:1 か 2:1）、手番の人は他の人と自由に交渉できる
  * - 最長交易路（5本以上つながった道）と最大騎士力（騎士3枚以上）はそれぞれ2点
  * - 自分の手番に10点に達したら勝ち
+ *
+ * リアルタイムモード（mode: 'realtime'）：待ち時間を減らすため、初期配置のあとは全員が同時に動く
+ * - 巡のはじめに、全員が同時にサイコロを振る（自動）。どの人の目でも、全員が資源をもらう
+ *   - 7 を出した人がいれば、その巡の生産の前に、手札が8枚以上の人は半分を捨てる（何人が7を出しても1回）
+ *   - 7 を出した人は、それぞれ盗賊を動かして1枚奪う
+ * - 各自が好きな順に、建設・交換・発展カード（1巡に1枚）を行い、「完了」する。同じ場所は早い者勝ち
+ * - 交渉は誰でも持ちかけられる（同時に進む交渉は1つまで）
+ * - 全員が完了したら、次の巡に進む。10点に達したら、その場で勝ち
  */
 
 import { createRandom, createSeed, shuffle } from './random.js';
@@ -43,6 +51,7 @@ export const DEV_NAMES = { knight: '騎士', victoryPoint: '勝利点', roadBuil
 export const PIECE_NAMES = { road: '道', settlement: '開拓地', city: '都市' };
 const MAX_LOGS = 200;
 const MAX_EVENTS = 40; // 演出のために持つ、最近のイベントの数
+export const MODES = ['classic', 'realtime']; // 通常 / リアルタイム
 
 export const emptyCards = () => Object.fromEntries(RESOURCES.map(r => [r, 0]));
 export const countCards = (cards) => RESOURCES.reduce((sum, r) => sum + (cards[r] ?? 0), 0);
@@ -67,11 +76,12 @@ export function parseCards(value) {
 
 export default class Game {
     // players: [{ name, isCPU }]
-    constructor(players, { seed = createSeed() } = {}) {
+    constructor(players, { seed = createSeed(), mode = 'classic' } = {}) {
         if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
             throw new Error(`${MIN_PLAYERS}〜${MAX_PLAYERS}人で遊んでください`);
         }
         this.seed = seed;
+        this.mode = MODES.includes(mode) ? mode : 'classic';
         this.random = createRandom(seed);
         // proxy: 部屋を出た人の代わりに CPU が打っている
         this.players = players.map(({ name, isCPU }, id) => ({
@@ -111,6 +121,12 @@ export default class Game {
         this.largestArmy = null;       // 最大騎士力の持ち主
         this.roadLengths = this.players.map(() => 0);
 
+        // リアルタイムモードの、人ごとの状態（巡ごとに作り直す）
+        this.done = this.players.map(() => false);       // この巡を完了したか
+        this.rolls = this.players.map(() => null);       // この巡に振った目 [d1, d2]
+        this.queues = this.players.map(() => []);        // 先に片付ける処理 { type: 'discard', count } / { type: 'robber' } / { type: 'roadBuilding', remaining }
+        this.devPlayedBy = this.players.map(() => false); // この巡に発展カードを使ったか
+
         this.commands = [];
         this.logs = [];                // { text, secret?: { seats, text } }
         // 起きたこと（画面の演出に使う）。{ id, type, ... }。受け付けた操作でだけ増える
@@ -149,6 +165,13 @@ export default class Game {
             return this.record(playerId, recorded, () => this.respondTrade(player, recorded.id, recorded.accept));
         }
 
+        // リアルタイムモードの初期配置のあとは、全員が同時に動く（同じ場所は先に届いた操作が通る）
+        if (this.isRealtimePlay()) {
+            const accepted = this.applyTurnCommand(player, command);
+            if (accepted) this.checkWinAll(player);
+            return accepted;
+        }
+
         if (playerId !== this.currentPlayerIndex) return this.reject('あなたの番ではありません');
         if (this.pending?.type === 'discard') return this.reject('手札を捨てる人を待っています');
 
@@ -185,7 +208,7 @@ export default class Game {
             case 'confirmTrade':
                 return this.record(player.id, { type, id: command.id, with: command.with }, () => this.confirmTrade(player, command.id, command.with));
             case 'cancelTrade':
-                return this.record(player.id, { type }, () => this.cancelTrade());
+                return this.record(player.id, { type }, () => this.cancelTrade(player));
             case 'endTurn':
                 return this.record(player.id, { type }, () => this.endTurn(player));
             default:
@@ -204,8 +227,12 @@ export default class Game {
 
     build(player, piece, at) {
         if (this.phase === 'setup') return this.buildSetup(player, piece, at);
-        const free = this.pending?.type === 'roadBuilding';
-        if (this.pending && !(free && piece === 'road')) return this.reject(this.pendingMessage());
+        const pending = this.pendingOf(player.id);
+        const free = pending?.type === 'roadBuilding';
+        if (!(free && piece === 'road')) {
+            const blocked = this.blockedFor(player);
+            if (blocked) return this.reject(blocked);
+        }
         if (!free && !this.rolled) return this.reject('先にサイコロを振ってください');
         if (!PIECES[piece]) return this.reject('その建物はありません');
         if (player.pieces[piece] === 0) return this.reject(`${PIECE_NAMES[piece]}はもう残っていません`);
@@ -218,8 +245,8 @@ export default class Game {
         this.emit('build', { player: player.id, piece, at, cost: free ? null : { ...COSTS[piece] } });
         this.place(player, piece, at);
         if (free) {
-            this.pending.remaining--;
-            if (this.pending.remaining === 0 || player.pieces.road === 0 || this.roadSpots(player.id).length === 0) this.pending = null;
+            pending.remaining--;
+            if (pending.remaining === 0 || player.pieces.road === 0 || this.roadSpots(player.id).length === 0) this.clearPending(player.id);
         }
         this.log(`${player.name}が${PIECE_NAMES[piece]}を${free ? '無料で' : ''}建てました`);
         return true;
@@ -264,8 +291,13 @@ export default class Game {
         if (this.setupIndex === this.setupOrder.length) {
             this.phase = 'play';
             this.currentPlayerIndex = this.setupOrder[0];
-            this.turnNumber = 1;
-            this.log(`初期配置が終わりました。${this.getCurrentPlayer().name}の番です`);
+            if (this.mode === 'realtime') {
+                this.log('初期配置が終わりました。全員が同時に動きます');
+                this.startRound();
+            } else {
+                this.turnNumber = 1;
+                this.log(`初期配置が終わりました。${this.getCurrentPlayer().name}の番です`);
+            }
         } else {
             this.currentPlayerIndex = this.setupOrder[this.setupIndex];
         }
@@ -337,6 +369,7 @@ export default class Game {
 
     roll(player) {
         if (this.phase !== 'play') return this.reject('初期配置の途中です');
+        if (this.mode === 'realtime') return this.reject('サイコロは巡のはじめに自動で振ります');
         if (this.pending) return this.reject(this.pendingMessage());
         if (this.rolled) return this.reject('サイコロはもう振りました');
         const d1 = 1 + Math.floor(this.random() * 6);
@@ -411,13 +444,19 @@ export default class Game {
     }
 
     discard(player, value) {
-        const required = this.pending?.type === 'discard' ? this.pending.remaining[player.id] : undefined;
+        const pending = this.pendingOf(player.id);
+        const required = pending?.type === 'discard' ? pending.remaining[player.id] : undefined;
         if (!required) return this.reject('今は手札を捨てる必要はありません');
         const cards = parseCards(value);
         if (!cards || countCards(cards) !== required) return this.reject(`${required}枚を選んで捨ててください`);
         if (!hasCards(player.hand, cards)) return this.reject('持っていない資源は捨てられません');
         this.pay(player, cards);
         this.emit('discard', { player: player.id, cards });
+        if (this.mode === 'realtime' && this.phase === 'play') {
+            this.clearPending(player.id);
+            this.log(`${player.name}が${required}枚捨てました（${formatCards(cards)}）`);
+            return true;
+        }
         delete this.pending.remaining[player.id];
         this.log(`${player.name}が${required}枚捨てました（${formatCards(cards)}）`);
         if (Object.keys(this.pending.remaining).length === 0) {
@@ -435,7 +474,7 @@ export default class Game {
     }
 
     moveRobber(player, hex, victim) {
-        if (this.pending?.type !== 'robber') return this.reject('今は盗賊を動かせません');
+        if (this.pendingOf(player.id)?.type !== 'robber') return this.reject('今は盗賊を動かせません');
         if (!isInt(hex, 0, HEX_COUNT - 1)) return this.reject('そのタイルはありません');
         if (hex === this.robber) return this.reject('盗賊は別のタイルに動かしてください');
         const victims = this.robberVictims(player.id, hex);
@@ -444,7 +483,7 @@ export default class Game {
 
         this.emit('robber', { player: player.id, from: this.robber, to: hex });
         this.robber = hex;
-        this.pending = null;
+        this.clearPending(player.id);
         if (victim === null) {
             this.log(`${player.name}が盗賊を動かしました`);
             return true;
@@ -465,7 +504,8 @@ export default class Game {
     // ===== 発展カード =====
 
     buyDevCard(player) {
-        if (this.pending) return this.reject(this.pendingMessage());
+        const blocked = this.blockedFor(player);
+        if (blocked) return this.reject(blocked);
         if (!this.rolled) return this.reject('先にサイコロを振ってください');
         if (this.devDeck.length === 0) return this.reject('発展カードはもうありません');
         if (!hasCards(player.hand, COSTS.devCard)) return this.reject('資源が足りません');
@@ -480,18 +520,25 @@ export default class Game {
     // 今使える発展カードの種類（勝利点は使うカードではない）
     playableDevCards(playerId) {
         const player = this.players[playerId];
-        if (this.phase !== 'play' || playerId !== this.currentPlayerIndex || this.devPlayed || this.pending) return [];
+        if (this.isRealtimePlay()) {
+            if (this.devPlayedBy[playerId] || this.blockedFor(player)) return [];
+        } else if (this.phase !== 'play' || playerId !== this.currentPlayerIndex || this.devPlayed || this.pending) {
+            return [];
+        }
         return [...new Set(player.devCards.filter(c => c.type !== 'victoryPoint' && c.turn < this.turnNumber).map(c => c.type))];
     }
 
     playDev(player, { card, resources, resource }) {
         if (this.phase !== 'play') return this.reject('初期配置の途中です');
-        if (this.pending) return this.reject(this.pendingMessage());
+        const blocked = this.blockedFor(player);
+        if (blocked) return this.reject(blocked);
         if (!DEV_NAMES[card] || card === 'victoryPoint') return this.reject('そのカードは使えません');
-        if (this.devPlayed) return this.reject('発展カードは1手番に1枚までです');
+        if (this.mode === 'realtime' ? this.devPlayedBy[player.id] : this.devPlayed) {
+            return this.reject(`発展カードは1${this.mode === 'realtime' ? '巡' : '手番'}に1枚までです`);
+        }
         const index = player.devCards.findIndex(c => c.type === card && c.turn < this.turnNumber);
         if (index < 0) {
-            return this.reject(player.devCards.some(c => c.type === card) ? '買った手番には使えません' : 'そのカードを持っていません');
+            return this.reject(player.devCards.some(c => c.type === card) ? `買った${this.mode === 'realtime' ? '巡' : '手番'}には使えません` : 'そのカードを持っていません');
         }
 
         if (card === 'yearOfPlenty') {
@@ -522,18 +569,19 @@ export default class Game {
         } else if (card === 'roadBuilding') {
             const remaining = Math.min(2, player.pieces.road);
             if (remaining === 0 || this.roadSpots(player.id).length === 0) return this.reject('道を置ける場所がありません');
-            this.pending = { type: 'roadBuilding', remaining };
+            this.setPending(player.id, { type: 'roadBuilding', remaining });
             this.emit('playDev', { player: player.id, card });
             this.log(`${player.name}が街道建設を使いました。道を${remaining}本無料で置けます`);
         } else {
             player.knights++;
-            this.pending = { type: 'robber' };
+            this.setPending(player.id, { type: 'robber' });
             this.emit('playDev', { player: player.id, card });
             this.log(`${player.name}が騎士を使いました`);
             this.updateLargestArmy(player);
         }
         player.devCards.splice(index, 1);
         this.devPlayed = true;
+        this.devPlayedBy[player.id] = true;
         return true;
     }
 
@@ -551,7 +599,8 @@ export default class Game {
     }
 
     bankTrade(player, give, get) {
-        if (this.pending) return this.reject(this.pendingMessage());
+        const blocked = this.blockedFor(player);
+        if (blocked) return this.reject(blocked);
         if (!this.rolled) return this.reject('先にサイコロを振ってください');
         if (!RESOURCES.includes(give) || !RESOURCES.includes(get) || give === get) return this.reject('交換する資源を選んでください');
         const ratio = this.tradeRatio(player.id, give);
@@ -567,7 +616,9 @@ export default class Game {
     }
 
     offerTrade(player, giveValue, getValue) {
-        if (this.pending) return this.reject(this.pendingMessage());
+        const blocked = this.blockedFor(player);
+        if (blocked) return this.reject(blocked);
+        if (this.trade && this.trade.from !== player.id) return this.reject('ほかの人の交渉が終わるのを待ってください');
         if (!this.rolled) return this.reject('先にサイコロを振ってください');
         const give = parseCards(giveValue);
         const get = parseCards(getValue);
@@ -592,6 +643,7 @@ export default class Game {
     confirmTrade(player, id, partnerId) {
         const trade = this.trade;
         if (!trade || trade.id !== id) return this.reject('その交渉は終わっています');
+        if (trade.from !== player.id) return this.reject('自分の交渉ではありません');
         if (trade.responses[partnerId] !== 'accept') return this.reject('その人は交渉を受けていません');
         const partner = this.players[partnerId];
         if (!hasCards(player.hand, trade.give) || !hasCards(partner.hand, trade.get)) return this.reject('資源が足りなくなっています');
@@ -605,10 +657,11 @@ export default class Game {
         return true;
     }
 
-    cancelTrade() {
+    cancelTrade(player) {
         if (!this.trade) return this.reject('交渉はありません');
+        if (this.trade.from !== player.id) return this.reject('自分の交渉ではありません');
         this.trade = null;
-        this.log(`${this.getCurrentPlayer().name}が交渉を取り下げました`);
+        this.log(`${player.name}が交渉を取り下げました`);
         return true;
     }
 
@@ -616,6 +669,7 @@ export default class Game {
 
     endTurn(player) {
         if (this.phase !== 'play') return this.reject('初期配置の途中です');
+        if (this.mode === 'realtime') return this.finishRound(player);
         if (this.pending) return this.reject(this.pendingMessage());
         if (!this.rolled) return this.reject('先にサイコロを振ってください');
         this.trade = null;
@@ -647,6 +701,11 @@ export default class Game {
         this.trade = null;
         this.result = { winnerId: player.id, points: this.players.map(p => this.points(p.id)) };
         this.log(`${player.name}が${this.points(player.id)}点に達して勝ちました！`);
+    }
+
+    // リアルタイムモード：操作した人を先に、全員の点を確かめる（ほかの人の道が分断されて点が動くこともあるため）
+    checkWinAll(actor) {
+        [actor, ...this.players.filter(p => p !== actor)].forEach(player => this.checkWin(player));
     }
 
     // 最長交易路の長さ（他人の建物がある頂点で道は途切れる）
@@ -705,6 +764,11 @@ export default class Game {
     // 今、操作が必要な人（CPU の進行と、ローカル対戦で誰の画面を出すかに使う）
     actors() {
         if (this.phase === 'end') return [];
+        if (this.isRealtimePlay()) {
+            // 完了していない人・先に片付ける処理がある人・交渉に答えていない人
+            return this.players.filter(p => !this.done[p.id] || this.queues[p.id].length > 0
+                || (this.trade && this.trade.from !== p.id && !this.trade.responses[p.id])).map(p => p.id);
+        }
         if (this.pending?.type === 'discard') return Object.keys(this.pending.remaining).map(Number);
         if (this.trade) {
             const waiting = this.players.filter(p => p.id !== this.trade.from && !this.trade.responses[p.id]).map(p => p.id);
@@ -720,6 +784,81 @@ export default class Game {
             case 'roadBuilding': return '先に街道建設の道を置いてください';
             default: return '今はその操作はできません';
         }
+    }
+
+    // ===== リアルタイムモード =====
+
+    isRealtimePlay() {
+        return this.mode === 'realtime' && this.phase === 'play';
+    }
+
+    // seat の人が先に片付ける処理（なければ null）。手札を捨てるときは、通常モードと同じ形 { type: 'discard', remaining: { 席: 枚数 } }
+    pendingOf(seat) {
+        if (this.mode === 'realtime' && this.phase === 'play') {
+            const head = this.queues[seat]?.[0];
+            if (!head) return null;
+            return head.type === 'discard' ? { type: 'discard', remaining: { [seat]: head.count } } : head;
+        }
+        if (this.pending?.type === 'discard') return this.pending.remaining[seat] ? this.pending : null;
+        return seat === this.currentPlayerIndex ? this.pending : null;
+    }
+
+    setPending(seat, pending) {
+        if (this.mode === 'realtime' && this.phase === 'play') this.queues[seat].unshift(pending);
+        else this.pending = pending;
+    }
+
+    clearPending(seat) {
+        if (this.mode === 'realtime' && this.phase === 'play') this.queues[seat].shift();
+        else this.pending = null;
+    }
+
+    // ふだんの操作（建設・交換・発展カード・完了）ができないときの理由。できるなら null
+    blockedFor(player) {
+        if (this.mode === 'realtime' && this.phase === 'play') {
+            const head = this.queues[player.id][0];
+            if (head) return { discard: '先に手札を捨ててください', robber: '先に盗賊を動かしてください', roadBuilding: '先に街道建設の道を置いてください' }[head.type];
+            if (this.done[player.id]) return 'この巡はもう完了しています。全員が完了するのを待ってください';
+            return null;
+        }
+        return this.pending ? this.pendingMessage() : null;
+    }
+
+    // 巡を始める：全員が同時にサイコロを振る
+    startRound() {
+        this.turnNumber++;
+        this.rolled = true;
+        this.trade = null;
+        this.done = this.players.map(() => false);
+        this.devPlayedBy = this.players.map(() => false);
+        this.queues = this.players.map(() => []);
+        this.rolls = this.players.map(() => [1 + Math.floor(this.random() * 6), 1 + Math.floor(this.random() * 6)]);
+        this.dice = null;
+        this.log(`第${this.turnNumber}巡。全員がサイコロを振りました（${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}）`);
+        this.players.forEach(p => this.emit('roll', { player: p.id, dice: [...this.rolls[p.id]] }));
+        const sevens = this.players.filter(p => this.rolls[p.id][0] + this.rolls[p.id][1] === 7);
+        // 7 があれば、生産の前に手札を半分捨てる（何人が7を出しても1回）
+        if (sevens.length > 0) {
+            const discarding = this.players.filter(p => countCards(p.hand) > HAND_LIMIT);
+            discarding.forEach(p => this.queues[p.id].push({ type: 'discard', count: Math.floor(countCards(p.hand) / 2) }));
+            this.log(`7 が出ました（${sevens.map(p => p.name).join('・')}）。${discarding.length ? `手札が${HAND_LIMIT + 1}枚以上の人は半分を捨てます` : '盗賊を動かします'}`);
+        }
+        this.players.forEach(p => {
+            const sum = this.rolls[p.id][0] + this.rolls[p.id][1];
+            if (sum !== 7) this.produce(sum);
+        });
+        sevens.forEach(p => this.queues[p.id].push({ type: 'robber' }));
+    }
+
+    // seat の人がこの巡を完了する。全員が完了したら次の巡へ
+    finishRound(player) {
+        const blocked = this.blockedFor(player);
+        if (blocked) return this.reject(blocked);
+        if (this.trade?.from === player.id) this.trade = null;
+        this.done[player.id] = true;
+        this.log(`${player.name}が完了しました`);
+        if (this.done.every(Boolean)) this.startRound();
+        return true;
     }
 
     // 資源を銀行に払う（sign = -1 で銀行からもらう）

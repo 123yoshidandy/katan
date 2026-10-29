@@ -34,12 +34,12 @@ function randomCommand(pick, game) {
 }
 
 describe('断られた操作', () => {
-    it('どんな操作でも、断られたときは状態を変えず、受け付けた操作は記録から再現できる', () => {
+    it.each(['classic', 'realtime'])('どんな操作でも、断られたときは状態を変えず、受け付けた操作は記録から再現できる（%s）', (mode) => {
         for (let seed = 1; seed <= 12; seed++) {
             const random = createRandom(seed * 7919);
             const pick = (items) => items[Math.floor(random() * items.length)];
             const players = Array.from({ length: 2 + (seed % 3) }, (_, i) => ({ name: `P${i}`, isCPU: true }));
-            const game = new Game(players, { seed });
+            const game = new Game(players, { seed, mode });
             for (let step = 0; step < 4000 && game.phase !== 'end'; step++) {
                 for (let n = 0; n < 3; n++) {
                     const seat = Math.floor(random() * players.length);
@@ -50,7 +50,7 @@ describe('断られた操作', () => {
                 }
                 runCpuStep(game);
             }
-            const copy = Game.replay(players, { seed }, game.commands);
+            const copy = Game.replay(players, { seed, mode }, game.commands);
             expect(snapshot(copy)).toBe(snapshot(game));
         }
     });
