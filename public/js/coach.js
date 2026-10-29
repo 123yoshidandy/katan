@@ -84,11 +84,11 @@ export function coachStory(view, mode = null) {
     const sources = resourceSources(view, me.id);
     const chips = uniqueChips(lacking.flatMap(r => sources[r]).filter(x => !x.blocked)).map(chip => ({ chip }));
 
-    return [say(WHY[piece]), need, nextStep(view, hint, { lacking, missingCount: countCards(missing), chips, act, mode })].filter(Boolean);
+    return [say(WHY[piece]), need, nextStep(view, hint, { piece, lacking, missingCount: countCards(missing), chips, act, mode })].filter(Boolean);
 }
 
 // 今すること（最後の文）
-function nextStep(view, hint, { lacking, missingCount, chips, act, mode }) {
+function nextStep(view, hint, { piece, lacking, missingCount, chips, act, mode }) {
     // 相手の番：待っている間に何が起きればよいか
     if (!view.isMyTurn) {
         if (lacking.length === 0) return { parts: ['次の自分の番で建てられます'], strong: true };
@@ -103,7 +103,10 @@ function nextStep(view, hint, { lacking, missingCount, chips, act, mode }) {
     if (!hint) return null;
     switch (hint.type) {
         case 'roll': return { parts: ['まずサイコロを振って、資源を集めます'], strong: true };
-        case 'build': return act(`なので、${PIECE_NAMES[hint.piece]}を建てます`);
+        case 'build':
+            // 目指すもののほかに、余った材料で建てられる物
+            if (hint.piece !== piece) return act(`材料が余っているので、先に${PIECE_NAMES[hint.piece]}を建てておきます`);
+            return act(`なので、${PIECE_NAMES[hint.piece]}を建てます`);
         case 'bankTrade': {
             const ratio = view.options.tradeRatios[hint.give];
             const result = missingCount <= 1 ? 'に換えれば揃います' : 'に換えて、足りない分を減らします';

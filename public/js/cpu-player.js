@@ -163,6 +163,8 @@ function chooseTurn(game, seat) {
         const trade = planBankTrade(game, seat, COSTS[target.piece]);
         if (trade) return { type: 'bankTrade', ...trade };
     }
+    const extra = extraBuild(game, seat, target);
+    if (extra) return { type: 'build', ...extra };
     if (playable.includes('yearOfPlenty')) {
         const cost = target ? COSTS[target.piece] : COSTS.city;
         return { type: 'playDev', card: 'yearOfPlenty', resources: yearOfPlentyPick(game, player, cost) };
@@ -218,6 +220,28 @@ function buildTarget(game, seat) {
     if (city || expand) return city ?? expand;
     // 広げる先がなければ、道を長くする
     if (player.pieces.road > 0 && game.roadSpots(seat).length > 0) {
+        const at = chooseRoad(game, seat);
+        if (at !== null && at !== undefined) return { piece: 'road', at };
+    }
+    return null;
+}
+
+// 目標のほかに、目標の材料を減らさずに建てられる物 { piece, at }
+// 道は、道ばかりにならないよう、木材とレンガが2枚ずつあるときだけ
+function extraBuild(game, seat, target) {
+    const player = game.players[seat];
+    const keep = target ? COSTS[target.piece] : {};
+    // 建てる物に使う資源は、使ったあとも目標に要る枚数が残ること
+    const affordable = (piece) => RESOURCES.every(r => !COSTS[piece][r] || player.hand[r] - COSTS[piece][r] >= (keep[r] ?? 0));
+    if (target?.piece !== 'city' && player.pieces.city > 0 && affordable('city')) {
+        const cities = game.citySpots(seat);
+        if (cities.length) return { piece: 'city', at: best(cities, v => vertexValue(game, v, null)) };
+    }
+    if (target?.piece !== 'settlement' && player.pieces.settlement > 0 && affordable('settlement')) {
+        const spots = game.settlementSpots(seat);
+        if (spots.length) return { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player)) };
+    }
+    if (target?.piece !== 'road' && player.pieces.road > 0 && player.hand.wood >= 2 && player.hand.brick >= 2 && affordable('road')) {
         const at = chooseRoad(game, seat);
         if (at !== null && at !== undefined) return { piece: 'road', at };
     }
