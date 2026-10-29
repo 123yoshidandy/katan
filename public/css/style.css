@@ -1301,6 +1301,11 @@ dialog::backdrop {
         column-gap: 18px;
     }
 
+    /* 段が狭いので、得点の一覧は1列にする */
+    .help-body .point-list {
+        grid-template-columns: auto;
+    }
+
     .help-body section,
     .help-body .pic-row,
     .help-body .ui-sample,

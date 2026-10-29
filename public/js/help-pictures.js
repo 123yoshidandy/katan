@@ -123,7 +123,7 @@ const SCENES = {
         [harborBadge('sheep'), ...resources('sheep', 2), arrow(), res('ore')]
     ]),
 
-    // 5本つながった道
+    // 5本つながった道（枝分かれの道は数えない）
     longest: () => {
         const left = { x: -HEX_SIZE * Math.sqrt(3) / 2, y: 0 };
         const right = { x: HEX_SIZE * Math.sqrt(3) / 2, y: 0 };
@@ -135,7 +135,9 @@ const SCENES = {
             // 道の外側（上か右）に番号を置く
             return label(i === 4 ? mid.x + 18 : mid.x, i === 4 ? mid.y : mid.y - 18, String(i + 1));
         });
-        return scene('-122 -86 258 156', [tile(left.x, 0, null), tile(right.x, 0, null), ...roads, building(path[0], 'settlement', ME), ...numbers], 'pic-scene pic-mid');
+        // 開拓地は道の途中に置き、そこから番号のない枝分かれの道を1本出す（一続きの長さで数えることを見せる）
+        const branch = road(path[2], corner(left.x, 0, 2), ME);
+        return scene('-122 -86 258 156', [tile(left.x, 0, null), tile(right.x, 0, null), ...roads, branch, building(path[2], 'settlement', ME), ...numbers], 'pic-scene pic-mid');
     },
 
     // 盗賊のいるタイル：資源が出ず、そこに建物を持つ人から1枚奪う
