@@ -188,17 +188,35 @@ function robberHurts(game, seat) {
     return GEOMETRY.hexes[game.robber].vertices.some(v => game.buildings[v]?.owner === seat) && game.board.hexes[game.robber].number !== null;
 }
 
-// 次に建てたいもの { piece, at }（都市 → 開拓地 → 開拓地に向けた道）
+const EARLY_POINTS = 6; // これより少ないうちは、都市より開拓地・道で広げるのを優先する
+
+// 次に建てたいもの { piece, at }
+// 都市と「広げる手」（開拓地。置ける場所がなければ、開拓地を置ける場所へ向かう道）のうち、足りない資源が少ないほう
+// 序盤は広げる手を優先し、足りない資源が都市より1枚多いくらいまでなら広げる
 function buildTarget(game, seat) {
     const player = game.players[seat];
+    let city = null;
     if (player.pieces.city > 0) {
         const cities = game.citySpots(seat);
-        if (cities.length) return { piece: 'city', at: best(cities, v => vertexValue(game, v, null)) };
+        if (cities.length) city = { piece: 'city', at: best(cities, v => vertexValue(game, v, null)) };
     }
+    let expand = null;
     if (player.pieces.settlement > 0) {
         const spots = game.settlementSpots(seat);
-        if (spots.length) return { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player)) };
+        if (spots.length) {
+            expand = { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player)) };
+        } else if (player.pieces.road > 0) {
+            const at = chooseRoad(game, seat, { towardSpot: true });
+            if (at !== null && at !== undefined) expand = { piece: 'road', at };
+        }
     }
+    if (city && expand) {
+        const lack = (target) => RESOURCES.reduce((n, r) => n + Math.max(0, (COSTS[target.piece][r] ?? 0) - player.hand[r]), 0);
+        const allowance = game.points(seat) < EARLY_POINTS ? 1 : -1;
+        return lack(expand) <= lack(city) + allowance ? expand : city;
+    }
+    if (city || expand) return city ?? expand;
+    // 広げる先がなければ、道を長くする
     if (player.pieces.road > 0 && game.roadSpots(seat).length > 0) {
         const at = chooseRoad(game, seat);
         if (at !== null && at !== undefined) return { piece: 'road', at };
@@ -207,7 +225,8 @@ function buildTarget(game, seat) {
 }
 
 // 道を置く辺。開拓地を置ける良い頂点へ近づく辺を選ぶ（なければ、道を長くする辺）
-function chooseRoad(game, seat) {
+// towardSpot：開拓地を置ける頂点へ近づく辺がなければ null
+function chooseRoad(game, seat, { towardSpot = false } = {}) {
     const player = game.players[seat];
     const edges = game.roadSpots(seat);
     if (edges.length === 0) return null;
@@ -233,7 +252,9 @@ function chooseRoad(game, seat) {
         });
         return score;
     };
-    return best(edges, scoreEdge);
+    const edge = best(edges, scoreEdge);
+    if (towardSpot && !(scoreEdge(edge) > 0)) return null;
+    return edge;
 }
 
 // cost を払うために、余っている資源を銀行と交換する手（足りない分を全部まかなえるときだけ）

@@ -59,6 +59,7 @@ describe('作戦（状況の説明）', () => {
     it('都市を目指す理由・足りない資源（足りない材料は薄く）・今することがつながる', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
+        game.players[seat].pieces.road = 0; // 道を使い切り、広げる先がない（都市を目指す）
         game.players[seat].hand = hand({ wheat: 1 });
         const view = viewOf(game, seat);
         expect(view.options.suggestion.command.type).toBe('endTurn');
@@ -73,6 +74,7 @@ describe('作戦（状況の説明）', () => {
     it('材料が揃えば建てる。銀行と交換すれば揃うなら、交換を勧める', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;
+        game.players[seat].pieces.road = 0; // 道を使い切り、広げる先がない（都市を目指す）
         game.players[seat].hand = hand({ wheat: 2, ore: 3 });
         expect(story(game, seat)).toBe('都市にすると1点増え、資源も2倍です。材料は揃っています。《なので、都市を建てます★》');
         game.players[seat].hand = hand({ wheat: 2, ore: 2, sheep: 4 });

@@ -37,7 +37,22 @@ describe('アシスト（おすすめの手）', () => {
         game.players[seat].hand = { wood: 0, brick: 0, sheep: 0, wheat: 1, ore: 0 };
         const { command, goal } = createGameView(game, seat).options.suggestion;
         expect(command.type).toBe('endTurn');
-        expect(goal.piece).toBe('city');
-        expect(goal.missing).toEqual({ wood: 0, brick: 0, sheep: 0, wheat: 1, ore: 3 });
+        // 序盤は、都市より近い開拓地・道で広げる（ここでは、開拓地を置ける場所へ向かう道）
+        expect(goal.piece).toBe('road');
+        expect(goal.missing).toEqual({ wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 });
+    });
+
+    it('序盤でも、都市の材料が揃っていれば都市を建てる', () => {
+        const game = new Game(humans(2), { seed: 5 });
+        while (game.phase === 'setup') {
+            const seat = game.currentPlayerIndex;
+            game.applyCommand(seat, createGameView(game, seat).options.suggestion.command);
+        }
+        const seat = game.currentPlayerIndex;
+        game.applyCommand(seat, { type: 'roll' });
+        game.pending = null;
+        game.players[seat].hand = { wood: 0, brick: 0, sheep: 0, wheat: 2, ore: 3 };
+        const { command } = createGameView(game, seat).options.suggestion;
+        expect(command).toMatchObject({ type: 'build', piece: 'city' });
     });
 });
