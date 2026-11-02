@@ -16,9 +16,13 @@ import { GEOMETRY, pips, otherEnd } from './board.js';
 
 const isControlledByCpu = (player) => player.isCPU || player.proxy;
 
+// seat の人が、持ちかけられた交渉にまだ答えていないか
+const isAnsweringTrade = (game, seat) => Boolean(game.trade) && seat !== game.trade.from && !game.trade.responses[seat];
+// 交渉に、まだ答えていない人間がいるか
+const humanAnswering = (game) => game.players.some(p => !isControlledByCpu(p) && isAnsweringTrade(game, p.id));
+
 // 操作が必要な CPU の席（いなければ null）
-// ready(seat) が false の席は飛ばす（ローカル対戦で、交渉の返事を少し待たせるのに使う）
-export function cpuActor(game, ready = () => true) {
+export function cpuActor(game) {
     // リアルタイムモードでは、CPU が交互に動くよう、記録の長さで順番をずらす
     const actors = game.actors();
     const shift = game.isRealtimePlay() && actors.length ? game.commands.length % actors.length : 0;
@@ -26,19 +30,18 @@ export function cpuActor(game, ready = () => true) {
         const player = game.players[id];
         // 交渉中の手番の人は、相手の返事を待つ（自分から交渉する CPU はいない）
         if (game.trade && id === game.trade.from) return false;
-        return isControlledByCpu(player) && ready(id);
+        // 交渉には人間が先に答える（人間が受ければ、CPU より先に交換が決まる）
+        if (isAnsweringTrade(game, id) && humanAnswering(game)) return false;
+        return isControlledByCpu(player);
     });
     return actor ?? null;
 }
 
-export const isCpuTurn = (game, ready) => game.phase !== 'end' && cpuActor(game, ready) !== null;
-
-// seat の人が、持ちかけられた交渉にまだ答えていないか
-export const isAnsweringTrade = (game, seat) => Boolean(game.trade) && seat !== game.trade.from && !game.trade.responses[seat];
+export const isCpuTurn = (game) => game.phase !== 'end' && cpuActor(game) !== null;
 
 // CPU を1手進める。進めたら true
-export function runCpuStep(game, ready) {
-    const seat = cpuActor(game, ready);
+export function runCpuStep(game) {
+    const seat = cpuActor(game);
     if (seat === null) return false;
     const command = chooseCommand(game, seat);
     if (game.applyCommand(seat, command)) return true;

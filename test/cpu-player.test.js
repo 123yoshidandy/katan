@@ -35,6 +35,29 @@ describe('CPU', () => {
         expect(cpuActor(game)).toBeNull();
     });
 
+    it('交渉には人間が先に答え、CPU は人間がみな答えてから答える', () => {
+        const game = new Game([{ name: '人A', isCPU: false }, { name: '人B', isCPU: false }, { name: 'CPU', isCPU: true }], { seed: 2 });
+        game.players.forEach(p => { p.isCPU = true; });
+        while (game.phase === 'setup') runCpuStep(game);
+        game.players[0].isCPU = false;
+        game.players[1].isCPU = false;
+        while (game.currentPlayerIndex !== 0) {
+            if (cpuActor(game) === null) game.applyCommand(game.currentPlayerIndex, game.rolled ? { type: 'endTurn' } : { type: 'roll' });
+            else runCpuStep(game);
+            game.pending = null;
+        }
+        if (!game.rolled) game.applyCommand(0, { type: 'roll' });
+        game.pending = null;
+        game.players[0].hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 3 };
+        game.players[2].hand = { wood: 1, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+        game.applyCommand(0, { type: 'offerTrade', give: { ore: 3 }, get: { wood: 1 } });
+        expect(cpuActor(game)).toBeNull();
+        // 人間が受ければ、CPU より先に交換が決まる
+        game.players[1].hand = { wood: 1, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+        game.applyCommand(1, { type: 'respondTrade', id: game.trade.id, accept: false });
+        expect(cpuActor(game)).toBe(2);
+    });
+
     it('部屋を出た人の手番は、代わりに CPU が打つ', () => {
         const game = new Game([{ name: 'A', isCPU: false }, { name: 'B', isCPU: false }], { seed: 4 });
         expect(cpuActor(game)).toBeNull();
