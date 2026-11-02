@@ -104,14 +104,14 @@ export function hydrateGameView(view) {
     const playing = view.phase !== 'end';
     const discardCount = me && view.pending?.type === 'discard' ? (view.pending.remaining[me.id] ?? 0) : 0;
     const tradeWaiting = Boolean(me && view.trade && view.trade.from !== me.id && !view.trade.responses[me.id]);
-    // リアルタイムモードの初期配置のあとは、完了するまでが自分の番
+    // リアルタイムモードの初期配置のあとは、いつでも自分の番（完了したあとも、次の巡を待つ間は動ける）
     const realtime = view.mode === 'realtime' && view.phase === 'play';
     return {
         ...view,
         me,
         current,
         realtime,
-        isMyTurn: realtime ? Boolean(me) && !view.done[me.id] : Boolean(me) && me === current && playing,
+        isMyTurn: realtime ? Boolean(me) : Boolean(me) && me === current && playing,
         discardCount,
         tradeWaiting
     };

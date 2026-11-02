@@ -1000,7 +1000,7 @@ export default class UI {
         devButton.dataset.count = me.devCardCount > 0 ? String(me.devCardCount) : '';
         devButton.classList.toggle('ready', view.options?.playableDevCards.length > 0);
         $('act-trade').disabled = !(canAct && view.rolled);
-        $('act-end').disabled = !(canAct && view.rolled);
+        $('act-end').disabled = !(canAct && view.rolled) || Boolean(view.realtime && view.done[me.id]);
 
         // アシスト：おすすめの操作のボタンに★
         const hint = this.mode ? null : this.hint(view);
@@ -1264,7 +1264,9 @@ export default class UI {
         const count = (v) => v.buildings.filter(Boolean).length + v.buildings.filter(b => b?.type === 'city').length + v.roads.filter(r => r !== null).length;
         if (count(view) > count(previous)) playEffect('build');
         if (view.trade && !previous.trade) playEffect('card');
-        if (view.isMyTurn && !previous.isMyTurn && view.phase === 'play' && view.me?.id === previous.me?.id) playEffect('turn');
+        // リアルタイムモードでは、完了したあとも自分の番のままなので、新しい巡で完了が外れたときに鳴らす
+        const newRound = view.realtime && view.me && previous.done?.[view.me.id] && !view.done[view.me.id];
+        if (((view.isMyTurn && !previous.isMyTurn) || newRound) && view.phase === 'play' && view.me?.id === previous.me?.id) playEffect('turn');
     }
 
     // サイコロを振るしかないときは、少し間を置いて自動で振る

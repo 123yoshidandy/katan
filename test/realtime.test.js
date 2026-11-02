@@ -54,11 +54,15 @@ describe('リアルタイムモード', () => {
         game.players.forEach(p => expect(countCards(p.hand)).toBeGreaterThan(0));
     });
 
-    it('全員が完了するまで次の巡に進まない。完了した人はもう操作できない', () => {
+    it('全員が完了するまで次の巡に進まない。完了した人も、次の巡を待つ間は建てたり交換したりできる', () => {
         const game = afterSetup(3);
         game.players[0].hand = cards({ wood: 1, brick: 1 });
+        game.players[1].hand = cards({ wood: 1, brick: 1, ore: 4 });
         expect(game.applyCommand(1, { type: 'endTurn' })).toBe(true);
         expect(game.applyCommand(1, { type: 'endTurn' })).toBe(false);
+        expect(game.applyCommand(1, { type: 'bankTrade', give: 'ore', get: 'wheat' })).toBe(true);
+        expect(game.applyCommand(1, { type: 'build', piece: 'road', at: game.roadSpots(1)[0] })).toBe(true);
+        expect(game.done[1]).toBe(true);
         expect(game.applyCommand(2, { type: 'endTurn' })).toBe(true);
         expect(game.turnNumber).toBe(1);
         // 手番の人でなくても建てられる
@@ -185,15 +189,18 @@ describe('リアルタイムモード', () => {
         expect(game.players[0].hand).toEqual(cards({ wood: 1 }));
     });
 
-    it('交渉を持ちかけた人が完了すると、交渉は取り下げになる。完了した人も交渉に答えられる', () => {
-        const game = afterSetup(2);
+    it('完了した人も交渉を持ちかけたり答えたりできる。交渉は次の巡が始まると取り下げになる', () => {
+        const game = afterSetup(3);
         game.players[0].hand = cards({ ore: 1 });
         game.players[1].hand = cards({ wood: 1 });
         game.applyCommand(0, { type: 'endTurn' });
+        game.applyCommand(1, { type: 'endTurn' });
         expect(game.applyCommand(1, { type: 'offerTrade', give: { wood: 1 }, get: { ore: 1 } })).toBe(true);
-        expect(game.actors()).toEqual([0, 1]);
+        expect(game.actors()).toEqual([0, 2]);
         expect(game.applyCommand(0, { type: 'respondTrade', id: game.trade.id, accept: false })).toBe(true);
-        expect(game.applyCommand(1, { type: 'endTurn' })).toBe(true);
+        expect(game.trade).not.toBeNull();
+        expect(game.applyCommand(2, { type: 'endTurn' })).toBe(true);
+        expect(game.turnNumber).toBe(2);
         expect(game.trade).toBeNull();
     });
 
@@ -239,7 +246,8 @@ describe('リアルタイムモード', () => {
         expect(view1.dice).toEqual([2, 2]);
         expect(view1.rolls).toEqual([[3, 4], [2, 2], [5, 6]]);
         expect(view1.done).toEqual([false, true, false]);
+        // 完了した人も、次の巡を待つ間は動ける
         expect(view0.isMyTurn).toBe(true);
-        expect(view1.isMyTurn).toBe(false);
+        expect(view1.isMyTurn).toBe(true);
     });
 });

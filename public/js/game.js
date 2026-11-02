@@ -856,11 +856,11 @@ export default class Game {
     }
 
     // ふだんの操作（建設・交換・発展カード・完了）ができないときの理由。できるなら null
+    // リアルタイムモードの完了は「次の巡に進んでよい」という意思表示なので、完了したあとも操作できる
     blockedFor(player) {
         if (this.mode === 'realtime' && this.phase === 'play') {
             const head = this.queues[player.id][0];
             if (head) return { discard: '先に手札を捨ててください', robber: '先に盗賊を動かしてください', roadBuilding: '先に街道建設の道を置いてください' }[head.type];
-            if (this.done[player.id]) return 'この巡はもう完了しています。全員が完了するのを待ってください';
             return null;
         }
         return this.pending ? this.pendingMessage() : null;
@@ -897,11 +897,11 @@ export default class Game {
         }
     }
 
-    // seat の人がこの巡を完了する。全員が完了したら次の巡へ
+    // seat の人がこの巡を完了する（次の巡に進んでよいと示す）。全員が完了したら次の巡へ
     finishRound(player) {
         const blocked = this.blockedFor(player);
         if (blocked) return this.reject(blocked);
-        if (this.trade?.from === player.id) this.trade = null;
+        if (this.done[player.id]) return this.reject('この巡はもう完了しています。全員が完了するのを待ってください');
         this.done[player.id] = true;
         if (this.done.every(Boolean)) this.startRound();
         return true;
