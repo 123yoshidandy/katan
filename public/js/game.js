@@ -51,6 +51,7 @@ export const DEV_NAMES = { knight: '騎士', victoryPoint: '勝利点', roadBuil
 export const PIECE_NAMES = { road: '道', settlement: '開拓地', city: '都市' };
 const MAX_LOGS = 200;
 const MAX_EVENTS = 40; // 演出のために持つ、最近のイベントの数
+const CPU_SEVEN_REROLLS = 1; // CPU が7を出したら振り直す回数（7で手札を捨てたり奪われたりするのは、CPU のせいだと不快なため）
 export const MODES = ['classic', 'realtime']; // 通常 / リアルタイム
 
 export const emptyCards = () => Object.fromEntries(RESOURCES.map(r => [r, 0]));
@@ -365,13 +366,20 @@ export default class Game {
 
     // ===== サイコロ・生産・盗賊 =====
 
+    // サイコロ2個を振る。CPU は7が出たら振り直すので、7が出にくい
+    rollDice(player) {
+        const throwDice = () => [1 + Math.floor(this.random() * 6), 1 + Math.floor(this.random() * 6)];
+        let dice = throwDice();
+        for (let i = 0; i < CPU_SEVEN_REROLLS && player.isCPU && dice[0] + dice[1] === 7; i++) dice = throwDice();
+        return dice;
+    }
+
     roll(player) {
         if (this.phase !== 'play') return this.reject('初期配置の途中です');
         if (this.mode === 'realtime') return this.reject('サイコロは巡のはじめに自動で振ります');
         if (this.pending) return this.reject(this.pendingMessage());
         if (this.rolled) return this.reject('サイコロはもう振りました');
-        const d1 = 1 + Math.floor(this.random() * 6);
-        const d2 = 1 + Math.floor(this.random() * 6);
+        const [d1, d2] = this.rollDice(player);
         this.dice = [d1, d2];
         this.rolled = true;
         const sum = d1 + d2;
@@ -866,7 +874,7 @@ export default class Game {
         this.done = this.players.map(() => false);
         this.devPlayedBy = this.players.map(() => false);
         this.queues = this.players.map(() => []);
-        this.rolls = this.players.map(() => [1 + Math.floor(this.random() * 6), 1 + Math.floor(this.random() * 6)]);
+        this.rolls = this.players.map(p => this.rollDice(p));
         this.dice = null;
         this.log(`サイコロを振りました。${this.players.map((p, i) => `${p.name} ${this.rolls[i][0] + this.rolls[i][1]}`).join('・')}`);
         this.players.forEach(p => this.emit('roll', { player: p.id, dice: [...this.rolls[p.id]] }));

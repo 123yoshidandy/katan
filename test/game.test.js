@@ -116,6 +116,19 @@ describe('手番', () => {
         expect(game.robber).toBe(hex);
     });
 
+    it('CPU は7が出たら1回だけ振り直すので、7が出にくい（人間は振り直さない）', () => {
+        const dice = (values) => { let i = 0; return () => values[i++ % values.length]; };
+        const human = { isCPU: false };
+        const cpu = { isCPU: true };
+        const game = afterSetup(3, 1);
+        game.random = dice([0.0, 0.99, 0.5, 0.5]); // 1+6、次に 4+4
+        expect(game.rollDice(human)).toEqual([1, 6]);
+        game.random = dice([0.0, 0.99, 0.5, 0.5]);
+        expect(game.rollDice(cpu)).toEqual([4, 4]);
+        game.random = dice([0.0, 0.99]); // 振り直しても7なら、そのまま
+        expect(game.rollDice(cpu)).toEqual([1, 6]);
+    });
+
     it('奪ったカードの種類は、奪った人と奪われた人のログにだけ出る', () => {
         const game = afterSetup(3, 1);
         const id = game.currentPlayerIndex;
