@@ -212,7 +212,7 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(a.last('state').view.result).toBeNull();
     });
 
-    describe('人間が複数いるときの交渉では、CPU は 2〜4 秒たってから答える', () => {
+    describe('人間が複数いるときの交渉では、CPU は人間がみな答えてから答える', () => {
         // 人間2人と CPU で始め、手番の人間がサイコロを振って盗賊を片付け、手番でない人間に交渉を持ちかける
         async function offerWithCpu() {
             const server = createTestServer(game);
@@ -240,18 +240,14 @@ describe('オンライン対戦（ゲームの定義）', () => {
             return { server, other, trade };
         }
 
-        it('持ちかけてから時刻を過ぎて、端末から何か届くと、CPU が答える', async () => {
-            const { server, other, trade } = await offerWithCpu();
-            server.clock.now += 1999;
+        it('人間が答えるまでは、時間がたっても CPU は答えない', async () => {
+            const { server, other } = await offerWithCpu();
+            server.clock.now += 60 * 60 * 1000;
             await other.send('ping', { clientTime: 0 });
             expect(other.last('state').view.trade.responses[2]).toBeUndefined();
-            server.clock.now += 2001;
-            await other.send('ping', { clientTime: 0 });
-            const after = other.last('state').view.trade;
-            expect(after === null || after.id !== trade.id || Boolean(after.responses[2])).toBe(true);
         });
 
-        it('ほかの人間がみな答えたら、時刻を待たずに CPU が答える', async () => {
+        it('ほかの人間がみな答えたら、CPU が答える', async () => {
             const { other, trade } = await offerWithCpu();
             await other.send('command', { command: { type: 'respondTrade', id: trade.id, accept: false } });
             const after = other.last('state').view.trade;
