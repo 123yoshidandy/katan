@@ -1765,14 +1765,16 @@ dialog::backdrop {
         gap: 6px;
     }
 
+    /* 押しやすいよう、縦画面と同じ 40px の高さにし、下のアイコンの行とも間を空ける */
     .title-side .buttons button {
+        min-height: 40px;
         padding: 6px 10px;
         font-size: 0.9rem;
         white-space: nowrap;
     }
 
     .setup-footer {
-        margin-top: 2px;
+        margin-top: 8px;
     }
 
     .player {
