@@ -76,6 +76,16 @@
     transform: rotate(-45deg);
 }
 
+/* 低い縦画面は、3行のまま行を詰めて、下のログに高さを残す */
+@media (orientation: portrait) and (max-height: 600px) {
+    .coach {
+        height: 57px;
+        padding: 3px 9px;
+        font-size: 0.72rem;
+        line-height: 17px;
+    }
+}
+
 /* 横の小さい画面は列が狭いので、4行まで入るようにする */
 @media (orientation: landscape) and (max-height: 500px) {
     .coach {

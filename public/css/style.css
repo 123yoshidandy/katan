@@ -1640,6 +1640,35 @@ dialog::backdrop {
     .title-art {
         width: min(80vw, 24dvh);
     }
+
+    /* ゲーム画面：手札とボタンを低い横画面と同じ高さに詰め、ログに2行分を残す。
+       それでも足りない分だけ、盤面が縮む */
+    #screen-game {
+        gap: 4px;
+    }
+
+    .board-area {
+        flex: 0 1 auto;
+        min-height: 0;
+    }
+
+    .res-card {
+        height: 32px;
+    }
+
+    .res-card .res-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    .actions button {
+        min-height: 36px;
+        font-size: 0.76rem;
+    }
+
+    .log {
+        min-height: calc(2 * 1.45em + 8px);
+    }
 }
 
 /* ===== 低い横画面（スマホ）では詰める ===== */
