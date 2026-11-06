@@ -4,12 +4,14 @@
  * 手番の人だけでなく、手札を捨てる人・交渉に答える人も操作するので、今操作が必要な人間から見たビューを渡す
  */
 
-import Game from './game.js';
+import Game, { RESOURCES } from './game.js';
+import { GEOMETRY } from './board.js';
 import { createGameView, hydrateGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, cpuActor } from './cpu-player.js';
 
 const CPU_STEP_DELAY_MS = 700; // CPUの手は1手ずつ間を置いて見せる
 const REALTIME_CPU_STEP_DELAY_MS = 350; // リアルタイムモードでは、CPU が並んで動くので間を短くする
+const STALL_LIMIT = 3; // CPU の手が進まないことがこの回数続いたら、いちばん単純な答えか「番を終える」で抜ける
 
 export default class LocalGameController {
     // players: [{ name, isCPU }] / listeners: onUpdate() / onError(message) / options: { mode }
@@ -56,13 +58,63 @@ export default class LocalGameController {
         clearTimeout(this.cpuTimer);
         if (!isCpuTurn(this.game)) return;
         this.cpuTimer = setTimeout(() => {
-            runCpuStep(this.game);
-            this.listeners.onUpdate?.();
-            this.scheduleCpu();
+            // どこで例外が出ても、必ず次の手を予約する（対戦が止まらないように）
+            try {
+                this.stepCpu();
+            } catch (error) {
+                console.error(error);
+            } finally {
+                try {
+                    this.listeners.onUpdate?.();
+                } finally {
+                    this.scheduleCpu();
+                }
+            }
         }, this.game.isRealtimePlay() ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS);
+    }
+
+    stepCpu() {
+        const before = this.game.commands.length;
+        try {
+            runCpuStep(this.game);
+        } catch (error) {
+            console.error(error);
+        }
+        this.stalls = this.game.commands.length === before ? (this.stalls ?? 0) + 1 : 0;
+        if (this.stalls < STALL_LIMIT) return;
+        this.stalls = 0;
+        const seat = cpuActor(this.game);
+        if (seat !== null) simpleCommands(this.game, seat).some(command => this.game.applyCommand(seat, command));
     }
 
     stop() {
         clearTimeout(this.cpuTimer);
     }
+}
+
+// CPU の手が進まないときに試す、いちばん単純な手（通るものを順に試す）
+export function simpleCommands(game, seat) {
+    const commands = [];
+    if (game.trade && seat !== game.trade.from && !game.trade.responses[seat]) {
+        commands.push({ type: 'respondTrade', id: game.trade.id, accept: false });
+    }
+    const pending = game.pendingOf(seat);
+    if (pending?.type === 'discard') {
+        // 手札の先頭の資源から順に捨てる
+        let count = pending.remaining[seat];
+        const cards = Object.fromEntries(RESOURCES.map(r => {
+            const n = Math.min(count, game.players[seat].hand[r]);
+            count -= n;
+            return [r, n];
+        }));
+        commands.push({ type: 'discard', cards });
+    }
+    if (pending?.type === 'robber') {
+        GEOMETRY.hexes.filter(h => h.id !== game.robber).forEach(h => {
+            commands.push({ type: 'moveRobber', hex: h.id, victim: null });
+            game.players.forEach(p => commands.push({ type: 'moveRobber', hex: h.id, victim: p.id }));
+        });
+    }
+    commands.push({ type: 'endTurn' });
+    return commands;
 }
