@@ -1,4 +1,4 @@
-// netplay-kit 1.3.0（1158f9b）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.7.0（097823d）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦の部屋の処理（ゲームに共通の部分）
  * 保存先（store）と送信（send）は外から渡すので、AWS でも手元のテスト用サーバーでも同じ処理を使える
@@ -152,7 +152,7 @@ export class RoomService {
             }
             try {
                 await this.saveRoom(room);
-                await this.flush(this.withLobby(room, lobbyBefore, outbox));
+                await this.flush(this.withVersion(room, this.withLobby(room, lobbyBefore, outbox)));
                 return;
             } catch (error) {
                 if (!(error instanceof ConflictError)) throw error;
@@ -165,8 +165,8 @@ export class RoomService {
             case 'create': return this.createRoom(connectionId, message);
             case 'join': return this.joinRoom(connectionId, message);
             case 'ping':
-                // 期限を使わないゲームは、部屋を読まずに返す（接続を保つための ping で読み込みを増やさない）
-                if (!this.game.deadline) return [this.pong(connectionId, message)];
+                // 期限を使わないゲームで、端末の版が付いていなければ、部屋を読まずに返す（接続を保つための ping で読み込みを増やさない）
+                if (!this.game.deadline && !Number.isFinite(message.version)) return [this.pong(connectionId, message)];
                 break;
         }
 
@@ -178,8 +178,8 @@ export class RoomService {
 
         let outbox;
         switch (message.action) {
-            case 'ping': outbox = [this.pong(connectionId, message)]; break;
-            case 'leave': return [...deadline.outbox, ...await this.leaveRoom(room, seat, connectionId, lobbyBefore)];
+            case 'ping': outbox = [this.pong(connectionId, message), ...this.resyncMessages(room, seat, message.version)]; break;
+            case 'leave': return this.withVersion(room, [...deadline.outbox, ...await this.leaveRoom(room, seat, connectionId, lobbyBefore)]);
             case 'start': outbox = this.startMatch(room, seat); break;
             case 'ready': outbox = this.setReady(room, seat, message.ready !== false); break;
             case 'backToLobby': outbox = this.backToLobby(room, seat); break;
@@ -192,7 +192,7 @@ export class RoomService {
 
         // 保存するのは、部屋が変わったときだけ（期限切れの処理を含む）
         if (outbox.save || deadline.save) await this.saveRoom(room);
-        return this.withLobby(room, lobbyBefore, [...deadline.outbox, ...outbox]);
+        return this.withVersion(room, this.withLobby(room, lobbyBefore, [...deadline.outbox, ...outbox]));
     }
 
     // ===== 部屋に入る =====
@@ -220,7 +220,7 @@ export class RoomService {
             }
         }
         await this.putConnection(connectionId, room.code);
-        return [this.joinedMessage(room, 0), ...this.lobbyMessages(room)];
+        return this.withVersion(room, [this.joinedMessage(room, 0), ...this.lobbyMessages(room)]);
     }
 
     // 部屋に参加する。token が参加者のものなら、その席に再接続する（対戦中でも戻れる。退出した人は戻れない）
@@ -256,7 +256,7 @@ export class RoomService {
         }
         const others = this.withLobby(room, lobbyBefore, outbox)
             .filter(entry => entry.connectionId !== connectionId);
-        return [...messages, ...others];
+        return this.withVersion(room, [...messages, ...others]);
     }
 
     // 部屋を出る。ロビーでは席から外し（後ろの人の席が詰まる）、対戦中・対戦後は「退出」として席を残す
@@ -479,6 +479,14 @@ export class RoomService {
         }
     }
 
+    // 部屋の状態（lobby）とビュー（state）に、部屋の版を付ける（保存したなら保存したあとの版）
+    // 操作ごとに別の Lambda が送るので、届く順は入れ替わりうる。端末は、前に受け取ったものより古い版を捨てる
+    withVersion(room, outbox) {
+        return outbox.map(entry => ['lobby', 'state'].includes(entry.message?.type)
+            ? { ...entry, message: { ...entry.message, version: room.version } }
+            : entry);
+    }
+
     async flush(outbox) {
         // 同じ端末へのメッセージは順番を守り、端末どうしは並べて送る
         // すべてのメッセージにサーバーの今の時刻を付ける（端末で時計のずれを直すため）
@@ -584,6 +592,18 @@ export class RoomService {
             .map((player, seat) => ({ player, seat }))
             .filter(({ player }) => player.connectionId)
             .map(({ player, seat }) => ({ connectionId: player.connectionId, message: createMessage(player, seat) }));
+    }
+
+    // 端末が最後に受け取った版（ping の version）より部屋が新しければ、取りこぼしたものの代わりに今の lobby と state を送り直す
+    // （送信が API Gateway に断られて届かなかったとき、どちらの端末も相手を待ったまま止まらないように。形は再接続と同じ）
+    resyncMessages(room, seat, version) {
+        if (!Number.isFinite(version) || room.version <= version) return [];
+        const messages = [{ connectionId: room.players[seat].connectionId, message: { ...this.lobbyState(room), seat } }];
+        if (room.status !== 'lobby' && room.game) {
+            const game = this.restoreGame(room);
+            messages.push(this.stateMessage(room, game, seat, this.game.joinMark ? this.game.joinMark(game) : null));
+        }
+        return messages;
     }
 
     pong(connectionId, { clientTime }) {

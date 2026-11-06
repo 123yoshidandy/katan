@@ -1,4 +1,4 @@
-// netplay-kit 1.3.0（1158f9b）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.7.0（097823d）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦のサーバーとの通信（画面側、ゲームに共通の部分）
  * 接続・再接続・参加情報の保存・ping・時計のずれの補正・送信・招待URL・イベント通知を行う。画面の描画はしない
@@ -18,16 +18,21 @@
     const DEFAULT_PING_INTERVAL_MS = 5 * 60 * 1000; // API Gateway は10分間何も送らないと切るので、その前に送る
     const DEFAULT_RECONNECT_DELAY_MS = 2000;
     const LEAVE_TIMEOUT_MS = 1500;                   // 退出の返事を待つ時間（届かなくても片付ける）
+    const JOIN_TIMEOUT_MS = 10000;                   // enterRoom が参加の返事を待つ時間
+    const DEFAULT_SYNC_IDLE_MS = 10000;              // 部屋にいて lobby・state がこの間届かなければ、版を添えた ping で取りこぼしを確かめる
 
     class NetplayClient {
         // serverUrl: 接続先（NetplayClient.resolveServerUrl で決めるとよい）
         // storageKey: 参加情報を保存する localStorage のキー（ゲームごとに変える）
         // cpuStepDelayMs: cpu: true の state を、この間隔で順に届ける（0 ならすぐ届ける）
-        constructor({ serverUrl, storageKey, pingIntervalMs = DEFAULT_PING_INTERVAL_MS,
+        //   手ごとに変えるなら (next, previous) => ms を渡す（next はこれから見せる state、previous は直前に見せた state か null）
+        // syncIdleMs: 部屋にいて lobby・state がこの間届かなければ、取りこぼしがないかサーバーに確かめる（0 なら確かめない）
+        constructor({ serverUrl, storageKey, pingIntervalMs = DEFAULT_PING_INTERVAL_MS, syncIdleMs = DEFAULT_SYNC_IDLE_MS,
             reconnectDelayMs = DEFAULT_RECONNECT_DELAY_MS, cpuStepDelayMs = 0, roomParam = 'room', keepParams = ['server'] } = {}) {
             this.serverUrl = serverUrl;
             this.storageKey = storageKey;
             this.pingIntervalMs = pingIntervalMs;
+            this.syncIdleMs = syncIdleMs;
             this.reconnectDelayMs = reconnectDelayMs;
             this.cpuStepDelayMs = cpuStepDelayMs;
             this.roomParam = roomParam;
@@ -44,11 +49,15 @@
             this.stateQueue = [];
             this.stateTimer = null;
             this.lastStateAt = 0;
+            this.lastState = null;             // 直前に見せた state（cpuStepDelayMs が関数のときに渡す）
+            this.nextDelay = null;             // 次の CPU の手を待たせる時間（関数は1手に1回だけ呼ぶ）
             this.pingTimer = null;
+            this.syncTimer = null;
             this.reconnectTimer = null;
             this.isLeaving = false;
             this.pendingName = null;
             this.joiningRoomCode = null;       // 最後に参加を頼んだ部屋番号
+            this.lastVersion = -Infinity;      // 最後に受け取った lobby・state の部屋の版
 
             // スマホのスリープから戻ったら、待たずにつなぎ直す
             if (typeof document !== 'undefined') {
@@ -170,10 +179,28 @@
         stopPing() {
             clearInterval(this.pingTimer);
             this.pingTimer = null;
+            clearTimeout(this.syncTimer);
+            this.syncTimer = null;
         }
 
+        // 部屋にいれば、最後に受け取った版を添える（サーバーの部屋のほうが新しければ、今の lobby と state が送り直される）
         ping() {
-            this.request({ action: 'ping', clientTime: Date.now() });
+            const message = { action: 'ping', clientTime: Date.now() };
+            if (this.isInRoom() && Number.isFinite(this.lastVersion)) message.version = this.lastVersion;
+            this.request(message);
+        }
+
+        // lobby・state が届くたびに掛け直す。届かないまま syncIdleMs たったら、版を添えた ping を送る
+        // （送信が API Gateway に断られて届かないことがある。相手の番を待つ側は何も送らないので、自分から確かめる）
+        scheduleSync() {
+            clearTimeout(this.syncTimer);
+            this.syncTimer = null;
+            if (!this.syncIdleMs) return;
+            this.syncTimer = setTimeout(() => {
+                if (!this.isOpen() || !this.isInRoom()) return;
+                this.ping();
+                this.scheduleSync();
+            }, this.syncIdleMs);
         }
 
         // ===== 部屋の操作 =====
@@ -193,6 +220,49 @@
             return this.request({ action: 'join', roomCode: code, name, token });
         }
 
+        // joinRoom と同じだが、参加できたら（joined）resolve し、断られたら reject する
+        // reject の Error には code がある（サーバーのコード、または 'disconnected'・'timeout'・'not_connected'）
+        // fromServer はサーバーに断られたとき true。'error' のイベントも、これまでどおり届く
+        async enterRoom(roomCode, name, { timeoutMs = JOIN_TIMEOUT_MS } = {}) {
+            let settle;
+            const result = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+            result.catch(() => {}); // 呼んだ側が受け取る前に断られても、未処理の reject にしない
+            const roomError = (message, code, fromServer = false) => Object.assign(new Error(message), { code, fromServer });
+            let settled = false;
+            const done = (error, message) => {
+                if (settled) return;
+                settled = true;
+                offs.forEach(off => off());
+                clearTimeout(timer);
+                if (error) settle.reject(error); else settle.resolve(message);
+            };
+            const offs = [
+                this.on('joined', message => done(null, message)),
+                this.on('error', message => done(roomError(message.message, message.code, true))),
+                this.on('connection', open => { if (!open) done(roomError('サーバーとの接続が切れました', 'disconnected')); })
+            ];
+            const timer = setTimeout(() => done(roomError('サーバーから返事がありません', 'timeout')), timeoutMs);
+            try {
+                if (!await this.joinRoom(roomCode, name)) done(roomError('サーバーに接続できませんでした', 'not_connected'));
+            } catch (error) {
+                done(Object.assign(error, { code: 'not_connected', fromServer: false }));
+            }
+            return result;
+        }
+
+        // 招待URL（?room=部屋番号）で開いていれば、その部屋に入る。招待URLでなければ null を返す
+        // サーバーに断られたら（部屋がない・満員など）、URL から部屋番号を外してから reject する（再読み込みで、また参加しようとしないように）
+        async joinFromInvite(name, options) {
+            const roomCode = NetplayClient.inviteRoomCode(this.roomParam);
+            if (!roomCode) return null;
+            try {
+                return await this.enterRoom(roomCode, name, options);
+            } catch (error) {
+                if (error.fromServer) this.setRoomUrl(null);
+                throw error;
+            }
+        }
+
         // 保存した参加情報で、前の席に戻る
         async resume() {
             if (!this.session) return false;
@@ -200,11 +270,12 @@
             return this.request({ action: 'join', roomCode: this.session.roomCode, token: this.session.token });
         }
 
-        // 部屋を出る（サーバーの返事を少し待って、接続を閉じる。参加情報も消す）
+        // 部屋を出る（サーバーの返事を少し待って、接続を閉じる。参加情報と、URL の部屋番号も消す）
         leave() {
             const sent = this.request({ action: 'leave' });
             this.isLeaving = true;
             this.clearSession();
+            this.setRoomUrl(null);
             if (!sent) {
                 this.close();
                 return;
@@ -260,8 +331,12 @@
 
         receive(message) {
             this.updateClock(message);
+            // 操作ごとに別の Lambda が送るので、届く順は入れ替わりうる。前に受け取ったものより古い版の lobby・state は捨てる
+            if (this.isStale(message)) return;
+            if (['lobby', 'state'].includes(message.type)) this.scheduleSync();
             switch (message.type) {
                 case 'joined':
+                    this.lastVersion = -Infinity;
                     this.seat = message.seat;
                     this.session = { roomCode: message.roomCode, token: message.token, seat: message.seat, name: this.pendingName ?? this.session?.name };
                     this.saveSession(this.session);
@@ -294,6 +369,14 @@
             }
             this.emit(message.type, message);
             this.emit('message', message);
+        }
+
+        // 部屋の版（version）が、前に受け取った lobby・state より小さければ古い。同じ版（CPU の手など、1回の保存で送ったもの）は捨てない
+        isStale(message) {
+            if (!['lobby', 'state'].includes(message.type) || typeof message.version !== 'number') return false;
+            if (message.version < this.lastVersion) return true;
+            this.lastVersion = message.version;
+            return false;
         }
 
         applyLobby(message) {
@@ -337,7 +420,7 @@
         playStates() {
             if (this.stateTimer || this.stateQueue.length === 0) return;
             const next = this.stateQueue[0];
-            const wait = next.cpu ? this.lastStateAt + this.cpuStepDelayMs - Date.now() : 0;
+            const wait = next.cpu ? this.lastStateAt + this.stepDelay(next) - Date.now() : 0;
             if (wait > 0) {
                 this.stateTimer = setTimeout(() => {
                     this.stateTimer = null;
@@ -352,15 +435,27 @@
                 this.emit('message', next);
             } else {
                 this.lastStateAt = Date.now();
+                this.lastState = next;
                 this.emit('state', next);
             }
             this.playStates();
+        }
+
+        // 関数なら、同じ手には同じ値を使う（待つあいだにタイマーで求め直しても、乱数の値が変わらないように）
+        stepDelay(next) {
+            if (typeof this.cpuStepDelayMs !== 'function') return this.cpuStepDelayMs;
+            if (this.nextDelay?.message !== next) {
+                this.nextDelay = { message: next, ms: Number(this.cpuStepDelayMs(next, this.lastState)) || 0 };
+            }
+            return this.nextDelay.ms;
         }
 
         clearStates() {
             clearTimeout(this.stateTimer);
             this.stateTimer = null;
             this.stateQueue = [];
+            this.lastState = null;
+            this.nextDelay = null;
         }
 
         // ===== 招待URL =====
@@ -385,9 +480,17 @@
             return new URLSearchParams(location.search).get(roomParam);
         }
 
+        // 招待URLで開いたときの部屋番号。部屋番号の形（数字4桁）でなければ null
+        static inviteRoomCode(roomParam = 'room') {
+            const roomCode = NetplayClient.roomCodeFromUrl(roomParam)?.trim();
+            return NetplayClient.isRoomCode(roomCode) ? roomCode : null;
+        }
+
         // 今の URL に部屋番号を入れる（再読み込みしても部屋に戻れる）。null で外す
         setRoomUrl(roomCode) {
+            if (typeof location === 'undefined' || typeof history === 'undefined') return;
             const url = new URL(location.href);
+            if (!roomCode && !url.searchParams.has(this.roomParam)) return;
             if (roomCode) {
                 url.searchParams.set(this.roomParam, roomCode);
             } else {

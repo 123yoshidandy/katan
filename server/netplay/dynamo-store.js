@@ -1,4 +1,4 @@
-// netplay-kit 1.3.0（1158f9b）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.7.0（097823d）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * DynamoDB の保存先
  * 1つのテーブルに、部屋（pk = ROOM#部屋番号）と接続（pk = CONN#接続ID）を入れる
@@ -18,8 +18,9 @@ export class DynamoStore {
         this.client = client;
     }
 
+    // 強い整合性で読む（既定の結果整合性では、保存した直後に1つ前の部屋が返ることがあり、古い部屋で操作を判定してしまう）
     async getItem(pk) {
-        const { Item } = await this.client.send(new GetCommand({ TableName: this.tableName, Key: { pk } }));
+        const { Item } = await this.client.send(new GetCommand({ TableName: this.tableName, Key: { pk }, ConsistentRead: true }));
         if (!Item) return null;
         const { pk: _pk, ...data } = Item;
         return data;
