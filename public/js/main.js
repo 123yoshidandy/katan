@@ -21,3 +21,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     ui.showSetup();
     await ui.resumeOnline();
 });
+
+// ホーム画面に置いて、オフラインでも開けるようにする（PWA）
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(registration => {
+        const urls = [location.href, ...performance.getEntriesByType('resource').map(entry => entry.name)];
+        registration.active?.postMessage({ type: 'cache-urls', urls });
+    }).catch(() => {});
+}
