@@ -432,6 +432,15 @@ input {
     height: 32px;
 }
 
+/* 横画面では、盤面の左にボタンの列の幅を取り、港の印や頂点にボタンが重ならないようにする
+   （縦横比を盤面の絵の部分にかけるため、content-box にする） */
+@media (orientation: landscape) {
+    .board-area {
+        box-sizing: content-box;
+        padding-left: 38px;
+    }
+}
+
 .stamps {
     position: absolute;
     top: 0;
@@ -692,6 +701,18 @@ input {
 
 .me-row {
     flex: none;
+    container-type: inline-size;
+}
+
+/* 自分の欄が狭いとき（低い横画面）は、名前の幅を残すため、項目名を1文字にする */
+@container (max-width: 260px) {
+    .me-row .stat-label .full {
+        display: none;
+    }
+
+    .me-row .stat-label .short {
+        display: inline;
+    }
 }
 
 /* 相手の札：1段目に名前と点数、その下に手札・発展・騎士・道 */
