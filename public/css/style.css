@@ -23,6 +23,12 @@ html, body {
     height: 100%;
 }
 
+/* 拡大させない（ピンチ・ダブルタップ）。盤面など、指で操作する要素は touch-action: none のまま */
+html { touch-action: pan-x pan-y; }
+/* 一覧の端まで来ても、スワイプを画面全体に渡さない（iOS で、しばらく一覧がスクロールしなくなるのを防ぐ） */
+html, body { overscroll-behavior: none; }
+.log, dialog, .help-body { overscroll-behavior: contain; }
+
 body {
     margin: 0;
     height: 100vh;

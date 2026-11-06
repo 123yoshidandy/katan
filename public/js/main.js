@@ -4,6 +4,10 @@
 
 import UI from './ui.js';
 
+// 画面を拡大させない（ふつうは style.css の touch-action で止まる。古い iOS は2本指の操作を止める）
+// touchmove は止めない（passive でない touchmove があると、スクロールの始まりが遅れるため）
+document.addEventListener('gesturestart', event => event.preventDefault());
+
 document.addEventListener('DOMContentLoaded', async () => {
     const ui = new UI();
 
