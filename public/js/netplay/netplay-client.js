@@ -1,4 +1,4 @@
-// netplay-kit 1.7.0（097823d）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.8.0（00e8556）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦のサーバーとの通信（画面側、ゲームに共通の部分）
  * 接続・再接続・参加情報の保存・ping・時計のずれの補正・送信・招待URL・イベント通知を行う。画面の描画はしない
@@ -10,7 +10,8 @@
  *   net.on('lobby', (lobby) => ...);       // 部屋の状態（対戦中も、参加者が変わるたびに届く）
  *   net.on('state', (state) => ...);       // 自分のビュー（CPU の手は cpuStepDelayMs ごとに順に届く）
  *   net.on('relay', (message) => ...);     // ゲーム独自のメッセージは type 名で受け取る
- *   await net.createRoom('あお');
+ *   await net.createRoom('あお');                       // { public: true } で公開の部屋にする
+ *   const rooms = await net.listRooms();               // 入れる公開の部屋の一覧
  *   net.send('solved', { round: 1 });
  */
 
@@ -19,6 +20,7 @@
     const DEFAULT_RECONNECT_DELAY_MS = 2000;
     const LEAVE_TIMEOUT_MS = 1500;                   // 退出の返事を待つ時間（届かなくても片付ける）
     const JOIN_TIMEOUT_MS = 10000;                   // enterRoom が参加の返事を待つ時間
+    const LIST_TIMEOUT_MS = 10000;                   // listRooms が一覧の返事を待つ時間
     const DEFAULT_SYNC_IDLE_MS = 10000;              // 部屋にいて lobby・state がこの間届かなければ、版を添えた ping で取りこぼしを確かめる
 
     class NetplayClient {
@@ -205,10 +207,31 @@
 
         // ===== 部屋の操作 =====
 
-        async createRoom(name) {
+        // { public: true } で公開の部屋にする（listRooms の一覧に載り、部屋番号を知らない人も入れる）
+        async createRoom(name, { public: isPublic = false } = {}) {
             await this.ensureConnected();
             this.pendingName = name;
-            return this.request({ action: 'create', name });
+            return this.request({ action: 'create', name, ...(isPublic ? { public: true } : {}) });
+        }
+
+        // 入れる公開の部屋の一覧を取る。[{ roomCode, hostName, players, maxPlayers, settings, createdAt }] で resolve する
+        // 入るときは、roomCode を enterRoom・joinRoom に渡す
+        async listRooms({ timeoutMs = LIST_TIMEOUT_MS } = {}) {
+            await this.ensureConnected();
+            return new Promise((resolve, reject) => {
+                const listError = (message, code) => Object.assign(new Error(message), { code });
+                const done = (error, rooms) => {
+                    offs.forEach(off => off());
+                    clearTimeout(timer);
+                    if (error) reject(error); else resolve(rooms);
+                };
+                const offs = [
+                    this.on('rooms', message => done(null, message.rooms ?? [])),
+                    this.on('connection', open => { if (!open) done(listError('サーバーとの接続が切れました', 'disconnected')); })
+                ];
+                const timer = setTimeout(() => done(listError('サーバーから返事がありません', 'timeout')), timeoutMs);
+                if (!this.request({ action: 'listRooms' })) done(listError('サーバーに接続できませんでした', 'not_connected'));
+            });
         }
 
         // 同じ部屋に入ったことがあれば、その席に戻る

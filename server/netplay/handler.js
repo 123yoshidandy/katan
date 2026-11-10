@@ -1,4 +1,4 @@
-// netplay-kit 1.7.0（097823d）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.8.0（00e8556）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * API Gateway（WebSocket）から呼ばれる Lambda の入口を作る
  * $connect は受け付けるだけ、$disconnect で切断を片付け、それ以外のメッセージは部屋の処理に渡す

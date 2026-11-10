@@ -1,4 +1,4 @@
-// netplay-kit 1.7.0（097823d）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.8.0（00e8556）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * 手元で使う保存先（テストと手元のテスト用サーバー用）
  * DynamoDB の保存先と同じ形で、部屋の版が違えば ConflictError を投げる
@@ -31,6 +31,14 @@ export class MemoryStore {
         }
         this.writes++;
         this.rooms.set(room.code, clone(room));
+    }
+
+    // 公開の部屋で、ロビーで待っていて、期限を過ぎていないもの
+    async listPublicRooms(nowSeconds = Math.floor(Date.now() / 1000)) {
+        this.reads++;
+        return [...this.rooms.values()]
+            .filter(room => room.isPublic && room.status === 'lobby' && room.expiresAt > nowSeconds)
+            .map(clone);
     }
 
     async getConnection(connectionId) {
