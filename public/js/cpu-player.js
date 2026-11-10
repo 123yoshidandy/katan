@@ -7,6 +7,11 @@
  *   足りない資源が少しなら、余っている資源を銀行と交換して建てる
  * - 盗賊: 一番点の高い相手の、よく出るタイルに置く
  * - 交渉: 欲しい資源がもらえ、相手が勝ちに近くなければ受ける
+ *
+ * 実際に打つ CPU は、人間のように見落とす（CASUAL）。アシストのおすすめ（suggest）は見落とさない（SHARP）
+ * - 場所の良さを少し見誤る・銀行との交換や、ついでに建てられる物に気づかないことがある
+ * - 盗賊は、点の高い人を狙わず、自分の建物がないタイルから選ぶ
+ * 見落としは手番（巡）ごと・席ごとに決まる（同じ手番の途中で考えが変わらない）。ゲームの乱数は使わない
  */
 
 import {
@@ -39,29 +44,66 @@ export function cpuActor(game) {
 
 export const isCpuTurn = (game) => game.phase !== 'end' && cpuActor(game) !== null;
 
+// ===== 判断の精度 =====
+
+// 0〜1 の値。シード・手番（巡）・席・項目から決まるので、同じ手番の中では同じ値になる
+function hash01(...parts) {
+    let h = 2166136261;
+    parts.forEach(part => {
+        h ^= part >>> 0;
+        h = Math.imul(h, 16777619);
+        h ^= h >>> 15;
+        h = Math.imul(h, 2246822507);
+        h ^= h >>> 13;
+    });
+    return (h >>> 0) / 2 ** 32;
+}
+
+// 見落としの種類（hash01 の項目）
+const NOTICE = { bankTrade: 1, extraBuild: 2, devCard: 3, valueNoise: 4, robber: 5 };
+
+// SHARP：見落とさない（アシストのおすすめ）
+const SHARP = { casual: false, noise: () => 0, overlooks: () => false };
+
+// CASUAL：人間のように見落とす（実際に打つ CPU）
+const VALUE_NOISE = 3.5;          // 場所の良さの見誤り（点の数で ±この幅。良い場所は 12 前後）
+const OVERLOOK = { bankTrade: 0.6, extraBuild: 0.5, devCard: 0.4 }; // 手番ごとに、気づかない割合
+function casualMind(game, seat) {
+    const key = (kind, id = 0) => hash01(game.seed, game.turnNumber, seat, kind, id);
+    return {
+        casual: true,
+        noise: (id) => (key(NOTICE.valueNoise, id) * 2 - 1) * VALUE_NOISE,
+        overlooks: (what) => key(NOTICE[what]) < OVERLOOK[what],
+        pick: (id) => key(NOTICE.robber, id)
+    };
+}
+
+// 実際に打つ CPU の手（見落としあり）
+export const chooseCpuCommand = (game, seat) => chooseCommand(game, seat, casualMind(game, seat));
+
 // CPU を1手進める。進めたら true
 export function runCpuStep(game) {
     const seat = cpuActor(game);
     if (seat === null) return false;
-    const command = chooseCommand(game, seat);
+    const command = chooseCpuCommand(game, seat);
     if (game.applyCommand(seat, command)) return true;
     // 考えた手が通らなかったら、手番を進めて止まらないようにする
     if ((game.isRealtimePlay() || seat === game.currentPlayerIndex) && game.applyCommand(seat, { type: 'endTurn' })) return true;
     throw new Error(`CPU の手を決められませんでした: ${JSON.stringify(command)} ${game.lastError}`);
 }
 
-export function chooseCommand(game, seat) {
+export function chooseCommand(game, seat, mind = SHARP) {
     const pending = game.pendingOf(seat);
     if (pending?.type === 'discard') {
         return { type: 'discard', cards: chooseDiscard(game, seat, pending.remaining[seat]) };
     }
     if (game.trade && seat !== game.trade.from && !game.trade.responses[seat]) {
-        return { type: 'respondTrade', id: game.trade.id, accept: wantsTrade(game, seat) };
+        return { type: 'respondTrade', id: game.trade.id, accept: wantsTrade(game, seat, mind) };
     }
-    if (game.phase === 'setup') return chooseSetup(game, seat);
-    if (pending?.type === 'robber') return chooseRobber(game, seat);
-    if (pending?.type === 'roadBuilding') return { type: 'build', piece: 'road', at: chooseRoad(game, seat) };
-    return chooseTurn(game, seat);
+    if (game.phase === 'setup') return chooseSetup(game, seat, mind);
+    if (pending?.type === 'robber') return chooseRobber(game, seat, mind);
+    if (pending?.type === 'roadBuilding') return { type: 'build', piece: 'road', at: chooseRoad(game, seat, mind) };
+    return chooseTurn(game, seat, mind);
 }
 
 // 人間へのアシスト：seat の人が今操作するなら、CPU ならどうするか（command）と、次に建てたいもの（goal）
@@ -88,8 +130,12 @@ export function buildGoal(game, seat) {
 
 // ===== 評価 =====
 
-// 頂点の価値（周りのタイルの点の数と、資源の種類・港）
-function vertexValue(game, vertex, player) {
+// 頂点の価値（周りのタイルの点の数と、資源の種類・港）。mind が見誤る分を足す
+function vertexValue(game, vertex, player, mind = SHARP) {
+    return exactVertexValue(game, vertex, player) + mind.noise(vertex);
+}
+
+function exactVertexValue(game, vertex, player) {
     const hexes = GEOMETRY.vertices[vertex].hexes.map(id => ({ ...game.board.hexes[id], id }));
     const kinds = new Set();
     let value = 0;
@@ -119,27 +165,30 @@ const best = (items, score) => items.reduce((top, item) => {
 
 // ===== 初期配置 =====
 
-function chooseSetup(game, seat) {
+function chooseSetup(game, seat, mind) {
     const player = game.players[seat];
     if (game.setupStep === 'settlement') {
-        return { type: 'build', piece: 'settlement', at: best(game.settlementSpots(seat), v => vertexValue(game, v, player)) };
+        return { type: 'build', piece: 'settlement', at: best(game.settlementSpots(seat), v => vertexValue(game, v, player, mind)) };
     }
     // 道は、その先に開拓地を置ける良い頂点がある向きへ
     const edges = game.roadSpots(seat);
     const at = best(edges, e => {
         const end = otherEnd(e, game.lastSettlement);
         const nexts = GEOMETRY.vertices[end].neighbors.filter(v => v !== game.lastSettlement && game.canPlaceSettlementAt(v));
-        return Math.max(0, ...nexts.map(v => vertexValue(game, v, player)));
+        return Math.max(0, ...nexts.map(v => vertexValue(game, v, player, mind)));
     });
     return { type: 'build', piece: 'road', at };
 }
 
 // ===== 盗賊 =====
 
-function chooseRobber(game, seat) {
-    const leaderPoints = (owner) => game.points(owner, { hidden: false }) + 1;
+const ROBBER_CHOICES = 3; // 見落としありの CPU は、よさそうなタイルのうち上位この数から選ぶ
+
+function chooseRobber(game, seat, mind) {
+    // 見落としありの CPU は、点の高い人を狙わず、相手をみな同じに見る（人間ばかり狙われると不快なため）
+    const leaderPoints = (owner) => (mind.casual ? 1 : game.points(owner, { hidden: false }) + 1);
     const hexes = GEOMETRY.hexes.map(h => h.id).filter(id => id !== game.robber);
-    const hex = best(hexes, id => {
+    const scoreHex = (id) => {
         let score = 0;
         GEOMETRY.hexes[id].vertices.forEach(v => {
             const b = game.buildings[v];
@@ -148,15 +197,21 @@ function chooseRobber(game, seat) {
             score += b.owner === seat ? -10 * weight : weight * leaderPoints(b.owner);
         });
         return score * (1 + pips(game.board.hexes[id].number)) + (game.robberVictims(seat, id).length > 0 ? 1 : 0);
-    });
+    };
+    let hex = best(hexes, scoreHex);
+    if (mind.casual) {
+        const ranked = hexes.filter(id => scoreHex(id) > 0).sort((a, b) => scoreHex(b) - scoreHex(a)).slice(0, ROBBER_CHOICES);
+        if (ranked.length) hex = ranked[Math.floor(mind.pick(0) * ranked.length)];
+    }
     const victims = game.robberVictims(seat, hex);
-    const victim = victims.length ? best(victims, o => game.points(o, { hidden: false }) * 10 + countCards(game.players[o].hand)) : null;
+    let victim = victims.length ? best(victims, o => game.points(o, { hidden: false }) * 10 + countCards(game.players[o].hand)) : null;
+    if (mind.casual && victims.length) victim = victims[Math.floor(mind.pick(1) * victims.length)];
     return { type: 'moveRobber', hex, victim };
 }
 
 // ===== 手番 =====
 
-function chooseTurn(game, seat) {
+function chooseTurn(game, seat, mind) {
     const player = game.players[seat];
     const playable = game.playableDevCards(seat);
 
@@ -164,13 +219,13 @@ function chooseTurn(game, seat) {
     if (playable.includes('knight') && robberHurts(game, seat)) return { type: 'playDev', card: 'knight' };
     if (!game.rolled) return { type: 'roll' };
 
-    const target = buildTarget(game, seat);
+    const target = buildTarget(game, seat, mind);
     if (target) {
         if (hasCards(player.hand, COSTS[target.piece])) return { type: 'build', piece: target.piece, at: target.at };
-        const trade = planBankTrade(game, seat, COSTS[target.piece]);
+        const trade = mind.overlooks('bankTrade') ? null : planBankTrade(game, seat, COSTS[target.piece]);
         if (trade) return { type: 'bankTrade', ...trade };
     }
-    const extra = extraBuild(game, seat, target);
+    const extra = mind.overlooks('extraBuild') ? null : extraBuild(game, seat, target, mind);
     if (extra) return { type: 'build', ...extra };
     if (playable.includes('yearOfPlenty')) {
         const cost = target ? COSTS[target.piece] : COSTS.city;
@@ -183,7 +238,7 @@ function chooseTurn(game, seat) {
     if (playable.includes('knight') && (game.points(seat) >= WIN_POINTS - 2 || player.knights + 1 >= 3)) {
         return { type: 'playDev', card: 'knight' };
     }
-    if (game.devDeck.length > 0 && hasCards(player.hand, COSTS.devCard)) {
+    if (game.devDeck.length > 0 && hasCards(player.hand, COSTS.devCard) && !mind.overlooks('devCard')) {
         // 開拓地や都市のための資源は残しておく
         const keepFor = target && target.piece !== 'road' ? COSTS[target.piece] : null;
         if (!keepFor || !RESOURCES.some(r => (COSTS.devCard[r] ?? 0) > 0 && player.hand[r] - (COSTS.devCard[r] ?? 0) < (keepFor[r] ?? 0))) {
@@ -202,20 +257,20 @@ const EARLY_POINTS = 6; // これより少ないうちは、都市より開拓�
 // 次に建てたいもの { piece, at }
 // 都市と「広げる手」（開拓地。置ける場所がなければ、開拓地を置ける場所へ向かう道）のうち、足りない資源が少ないほう
 // 序盤は広げる手を優先し、足りない資源が都市より1枚多いくらいまでなら広げる
-function buildTarget(game, seat) {
+function buildTarget(game, seat, mind = SHARP) {
     const player = game.players[seat];
     let city = null;
     if (player.pieces.city > 0) {
         const cities = game.citySpots(seat);
-        if (cities.length) city = { piece: 'city', at: best(cities, v => vertexValue(game, v, null)) };
+        if (cities.length) city = { piece: 'city', at: best(cities, v => vertexValue(game, v, null, mind)) };
     }
     let expand = null;
     if (player.pieces.settlement > 0) {
         const spots = game.settlementSpots(seat);
         if (spots.length) {
-            expand = { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player)) };
+            expand = { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player, mind)) };
         } else if (player.pieces.road > 0) {
-            const at = chooseRoad(game, seat, { towardSpot: true });
+            const at = chooseRoad(game, seat, mind, { towardSpot: true });
             if (at !== null && at !== undefined) expand = { piece: 'road', at };
         }
     }
@@ -227,7 +282,7 @@ function buildTarget(game, seat) {
     if (city || expand) return city ?? expand;
     // 広げる先がなければ、道を長くする
     if (player.pieces.road > 0 && game.roadSpots(seat).length > 0) {
-        const at = chooseRoad(game, seat);
+        const at = chooseRoad(game, seat, mind);
         if (at !== null && at !== undefined) return { piece: 'road', at };
     }
     return null;
@@ -236,18 +291,18 @@ function buildTarget(game, seat) {
 // 目標のほかに建てる物 { piece, at }
 // 開拓地・都市は、建てられるなら建てる
 // 道は、木材とレンガが2枚以上ずつあるときだけ（1枚ずつ残り、開拓地の材料を揃えられる。道ばかりにもならない）
-function extraBuild(game, seat, target) {
+function extraBuild(game, seat, target, mind) {
     const player = game.players[seat];
     if (target?.piece !== 'city' && player.pieces.city > 0 && hasCards(player.hand, COSTS.city)) {
         const cities = game.citySpots(seat);
-        if (cities.length) return { piece: 'city', at: best(cities, v => vertexValue(game, v, null)) };
+        if (cities.length) return { piece: 'city', at: best(cities, v => vertexValue(game, v, null, mind)) };
     }
     if (target?.piece !== 'settlement' && player.pieces.settlement > 0 && hasCards(player.hand, COSTS.settlement)) {
         const spots = game.settlementSpots(seat);
-        if (spots.length) return { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player)) };
+        if (spots.length) return { piece: 'settlement', at: best(spots, v => vertexValue(game, v, player, mind)) };
     }
     if (target?.piece !== 'road' && player.pieces.road > 0 && player.hand.wood >= 2 && player.hand.brick >= 2) {
-        const at = chooseRoad(game, seat);
+        const at = chooseRoad(game, seat, mind);
         if (at !== null && at !== undefined) return { piece: 'road', at };
     }
     return null;
@@ -255,7 +310,7 @@ function extraBuild(game, seat, target) {
 
 // 道を置く辺。開拓地を置ける良い頂点へ近づく辺を選ぶ（なければ、道を長くする辺）
 // towardSpot：開拓地を置ける頂点へ近づく辺がなければ null
-function chooseRoad(game, seat, { towardSpot = false } = {}) {
+function chooseRoad(game, seat, mind = SHARP, { towardSpot = false } = {}) {
     const player = game.players[seat];
     const edges = game.roadSpots(seat);
     if (edges.length === 0) return null;
@@ -276,7 +331,7 @@ function chooseRoad(game, seat, { towardSpot = false } = {}) {
                 frontier = next;
             }
             seen.forEach((depth, v) => {
-                if (game.canPlaceSettlementAt(v)) score = Math.max(score, vertexValue(game, v, player) - depth * 1.5);
+                if (game.canPlaceSettlementAt(v)) score = Math.max(score, vertexValue(game, v, player, mind) - depth * 1.5);
             });
         });
         return score;
@@ -329,20 +384,20 @@ function chooseDiscard(game, seat, count) {
 }
 
 // 資源ひとつの価値（次に建てたいものに足りない資源は高く、たくさん余っている資源は低く）
-function resourceValue(game, seat, resource, hand) {
-    const target = buildTarget(game, seat);
+function resourceValue(game, seat, resource, hand, mind) {
+    const target = buildTarget(game, seat, mind);
     const cost = target ? COSTS[target.piece] : COSTS.city;
     if (hand[resource] < (cost[resource] ?? 0)) return 2;
     if (hand[resource] - (cost[resource] ?? 0) >= 2) return 0.6;
     return 1;
 }
 
-function wantsTrade(game, seat) {
+function wantsTrade(game, seat, mind) {
     const { from, give, get } = game.trade;
     const hand = game.players[seat].hand;
     if (!hasCards(hand, get)) return false;
     if (game.points(from, { hidden: false }) >= WIN_POINTS - 2) return false;
-    const receive = RESOURCES.reduce((sum, r) => sum + give[r] * resourceValue(game, seat, r, hand), 0);
-    const pay = RESOURCES.reduce((sum, r) => sum + get[r] * resourceValue(game, seat, r, hand), 0);
+    const receive = RESOURCES.reduce((sum, r) => sum + give[r] * resourceValue(game, seat, r, hand, mind), 0);
+    const pay = RESOURCES.reduce((sum, r) => sum + get[r] * resourceValue(game, seat, r, hand, mind), 0);
     return receive > pay;
 }

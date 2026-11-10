@@ -103,9 +103,8 @@ describe('リアルタイムモード', () => {
         game.players[2].hand = cards({});
         fixDice(game, [[3, 4], [Math.max(1, n - 6), Math.min(6, n - 1)], [3, 4]]); // 0番と2番が7、1番の目で1番に資源が入る
         [0, 1, 2].forEach(seat => game.applyCommand(seat, { type: 'endTurn' }));
-        const total = countCards(game.players[1].hand);
-        expect(total).toBeGreaterThan(7);
-        expect(game.queues[1]).toEqual([{ type: 'discard', count: Math.floor(total / 2) }]);
+        // もらったあとは8〜9枚なので4枚捨てる（盗賊が1番の隣に動くと、捨てる前に奪われて手札は減ることがある）
+        expect(game.queues[1]).toEqual([{ type: 'discard', count: 4 }]);
     });
 
     it('7 が出たら、手札が8枚以上の人が半分捨て、盗賊はランダムなタイルに動く。ほかの人は待たずに動ける', () => {
