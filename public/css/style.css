@@ -166,6 +166,52 @@ button.link {
     cursor: pointer;
 }
 
+/* ボタンの横に並べるチェック（オンライン対戦の「公開にする」） */
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.check input {
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    accent-color: var(--sea-deep);
+    cursor: pointer;
+}
+
+/* 公開の部屋の一覧：作った人の名前と、人数・モード */
+#rooms-dialog {
+    width: min(360px, calc(100vw - 16px));
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.room-item .room-host {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.room-item .room-meta {
+    flex: none;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+#room-note:empty {
+    display: none;
+}
+
 .assist-toggle .assist-off { display: none; }
 .assist-toggle.off .assist-off { display: inline; }
 .assist-toggle.off { color: var(--muted); }

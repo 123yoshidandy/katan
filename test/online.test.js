@@ -204,6 +204,24 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(view().phase).toBe('play');
     });
 
+    it('公開の部屋は、モードと人数つきで一覧に出て、始まると消える。非公開の部屋は出ない', async () => {
+        const server = createTestServer(game);
+        const host = server.connect();
+        await host.send('create', { name: 'あき', public: true });
+        await host.send('setSettings', { settings: { mode: 'realtime' } });
+        const secret = server.connect();
+        await secret.send('create', { name: 'はる' });
+        const finder = server.connect();
+        await finder.send('listRooms');
+        expect(finder.last('rooms').rooms).toEqual([expect.objectContaining({
+            roomCode: host.last('joined').roomCode, hostName: 'あき', players: 1, maxPlayers: 4, settings: { mode: 'realtime' }
+        })]);
+        await host.send('addCpu');
+        await host.send('start');
+        await finder.send('listRooms');
+        expect(finder.last('rooms').rooms).toEqual([]);
+    });
+
     it('対戦後は、ホストが同じ顔ぶれで再戦できる', async () => {
         const server = createTestServer(game);
         const [a] = await server.createRoom(['あき']);

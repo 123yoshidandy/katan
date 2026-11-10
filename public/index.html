@@ -85,10 +85,12 @@
                 <label class="row">名前 <input id="online-name" maxlength="12" autocomplete="nickname"></label>
                 <div class="buttons">
                     <button id="create-room" class="primary">部屋を作る</button>
+                    <label class="check"><input type="checkbox" id="room-public">公開にする</label>
                 </div>
                 <label class="row">部屋番号 <input id="room-code" inputmode="numeric"></label>
                 <div class="buttons">
                     <button id="join-room" class="primary">参加する</button>
+                    <button id="find-rooms" class="online">公開の部屋を探す</button>
                     <button id="back-to-setup">戻る</button>
                 </div>
             </div>
@@ -97,7 +99,7 @@
         <!-- ロビー -->
         <section id="screen-lobby" class="screen hidden">
             <div class="panel narrow">
-                <h2>部屋 <span id="lobby-code"></span></h2>
+                <h2>部屋 <span id="lobby-code"></span> <span id="lobby-public" class="badge hidden">公開</span></h2>
                 <div class="buttons">
                     <button id="share-invite">招待URLを共有</button>
                 </div>
@@ -253,6 +255,19 @@
     </dialog>
 
     <!-- 設定（ブラウザに保存する） -->
+    <!-- 公開の部屋の一覧（サーバーはテーブルを読み通すので、開いたときと「更新」を押したときだけ取る） -->
+    <dialog id="rooms-dialog" class="sheet" tabindex="-1">
+        <div class="sheet-head">
+            <h2>公開の部屋</h2>
+            <button class="small icon close-dialog" aria-label="閉じる">✕</button>
+        </div>
+        <div id="room-list" class="buttons column"></div>
+        <p id="room-note" class="hint"></p>
+        <div class="buttons">
+            <button id="refresh-rooms">更新</button>
+        </div>
+    </dialog>
+
     <dialog id="settings-dialog" class="sheet" tabindex="-1">
         <div class="sheet-head">
             <h2>設定</h2>
