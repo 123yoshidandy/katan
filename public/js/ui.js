@@ -836,8 +836,10 @@ export default class UI {
     playerRow(view, player, { tile = false } = {}) {
         const row = element('div', { className: `player${tile ? ' tile' : ''}` });
         row.dataset.seat = player.id;
-        // リアルタイムモードでは、まだ完了していない人を金色の枠にし、完了した人には「完了」を出す
-        const acting = view.realtime ? !view.done[player.id] : player.id === view.currentPlayerId;
+        // リアルタイムモードでは、まだ完了していない人を金色の枠にし、完了した人には「完了」を出す（初期配置は、まだ置いている人を金色の枠に）
+        let acting = player.id === view.currentPlayerId;
+        if (view.realtime) acting = !view.done[player.id];
+        if (view.realtimeSetup) acting = view.setup.placing.includes(player.id);
         row.classList.toggle('current', acting && view.phase !== 'end');
         row.classList.toggle('finished', Boolean(view.realtime && view.done[player.id]));
         row.classList.toggle('me', player === view.me);
@@ -885,6 +887,7 @@ export default class UI {
             const left = view.done.filter(d => !d).length;
             return `ほかの人の完了を待っています（あと${left}人）`;
         }
+        if (view.realtimeSetup && view.me && !view.setup.step) return `ほかの人が置き終わるのを待っています（あと${view.setup.placing.length}人）`;
         if (!view.isMyTurn) return view.logs.at(-1) ?? '';
         if (view.phase === 'setup') {
             return view.setup.step === 'settlement' ? '開拓地を置く場所を選んでください' : '開拓地から伸ばす道を選んでください';

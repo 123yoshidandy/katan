@@ -25,9 +25,39 @@ function fixDice(game, dice) {
 }
 
 describe('リアルタイムモード', () => {
-    it('初期配置は順番どおり。終わると第1巡が始まり、全員が同時にサイコロを振る', () => {
+    it('初期配置は順番を待たずに、各自が開拓地と道を2回ずつ置く。2つ目の開拓地の周りの資源をもらう', () => {
         const game = new Game(players(3), { seed: 4, mode: 'realtime' });
-        expect(game.applyCommand((game.currentPlayerIndex + 1) % 3, { type: 'build', piece: 'settlement', at: 0 })).toBe(false);
+        const other = (game.currentPlayerIndex + 1) % 3;
+        expect(game.actors()).toEqual([0, 1, 2]);
+        // 手番の人でなくても置ける。道より先に開拓地
+        expect(game.applyCommand(other, { type: 'build', piece: 'road', at: 0 })).toBe(false);
+        const spot = (seat) => game.settlementSpots(seat).find(v => GEOMETRY.vertices[v].hexes.some(h => game.board.hexes[h].number));
+        const first = spot(other);
+        expect(game.applyCommand(other, { type: 'build', piece: 'settlement', at: first })).toBe(true);
+        expect(countCards(game.players[other].hand)).toBe(0);
+        // 同じ場所と隣は、ほかの人が先に取ったので置けない（距離のルール）
+        const me = (other + 1) % 3;
+        expect(game.applyCommand(me, { type: 'build', piece: 'settlement', at: first })).toBe(false);
+        expect(game.lastError).toBe('そこはほかの人が先に取りました');
+        expect(game.applyCommand(me, { type: 'build', piece: 'settlement', at: GEOMETRY.vertices[first].neighbors[0] })).toBe(false);
+        // 道は、置いたばかりの自分の開拓地につなげる
+        expect(game.roadSpots(other).every(e => [GEOMETRY.edges[e].a, GEOMETRY.edges[e].b].includes(first))).toBe(true);
+        expect(game.applyCommand(other, { type: 'build', piece: 'road', at: game.roadSpots(other)[0] })).toBe(true);
+        // 2つ目の開拓地で資源をもらい、置き終わったら置けない
+        const second = spot(other);
+        expect(game.applyCommand(other, { type: 'build', piece: 'settlement', at: second })).toBe(true);
+        expect(countCards(game.players[other].hand)).toBeGreaterThan(0);
+        expect(game.applyCommand(other, { type: 'build', piece: 'road', at: game.roadSpots(other)[0] })).toBe(true);
+        expect(game.setupStepOf(other)).toBeNull();
+        expect(game.actors()).not.toContain(other);
+        expect(game.applyCommand(other, { type: 'build', piece: 'settlement', at: spot(me) })).toBe(false);
+        expect(game.phase).toBe('setup');
+        // 記録から同じ状態を作り直せる
+        expect(Game.replay(players(3), { seed: 4, mode: 'realtime' }, game.commands).buildings).toEqual(game.buildings);
+    });
+
+    it('初期配置が全員済むと第1巡が始まり、全員が同時にサイコロを振る', () => {
+        const game = new Game(players(3), { seed: 4, mode: 'realtime' });
         game.players.forEach(p => { p.isCPU = true; });
         while (game.phase === 'setup') runCpuStep(game);
         expect(game.phase).toBe('play');

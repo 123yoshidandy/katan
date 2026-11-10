@@ -7,9 +7,9 @@ vi.mock('../public/js/cpu-player.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
-        runCpuStep: (game) => {
+        runCpuStep: (game, ...rest) => {
             if (broken) throw new Error('CPU の考えで例外');
-            return actual.runCpuStep(game);
+            return actual.runCpuStep(game, ...rest);
         }
     };
 });
@@ -42,6 +42,30 @@ describe('ローカル対戦のコントローラー', () => {
         expect(game.currentPlayerIndex).not.toBe(current);
         // 抜けたあとも、次の手が予約されている
         expect(vi.getTimerCount()).toBe(1);
+        controller.stop();
+    });
+
+    it('リアルタイムモードの初期配置では、CPU は人間が場所を選ぶくらいの間を置いて1つずつ置く', () => {
+        vi.useFakeTimers();
+        const players = [{ name: '人', isCPU: false }, { name: 'CPU1', isCPU: true }, { name: 'CPU2', isCPU: true }];
+        const controller = new LocalGameController(players, {}, { mode: 'realtime' });
+        const game = controller.game;
+        const placedBy = (seat) => game.commands.filter(c => c.playerId === seat).length;
+        vi.advanceTimersByTime(3900);
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        // 開拓地は 4〜7秒で置き、道はその 1.5秒後
+        vi.advanceTimersByTime(3200);
+        expect([game.setupCounts[1], game.setupCounts[2]]).toEqual([1, 1]);
+        // 人間は順番を待たずに置ける
+        expect(controller.send({ type: 'build', piece: 'settlement', at: game.settlementSpots(0)[0] })).toBe(true);
+        vi.advanceTimersByTime(60000);
+        expect([placedBy(1), placedBy(2)]).toEqual([4, 4]);
+        expect(game.phase).toBe('setup');
+        ['road', 'settlement', 'road'].forEach(piece => {
+            const at = piece === 'road' ? game.roadSpots(0)[0] : game.settlementSpots(0)[0];
+            expect(controller.send({ type: 'build', piece, at })).toBe(true);
+        });
+        expect(game.phase).toBe('play');
         controller.stop();
     });
 

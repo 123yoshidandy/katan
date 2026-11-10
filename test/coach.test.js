@@ -56,6 +56,15 @@ describe('作戦（状況の説明）', () => {
         expect(story(game, seat)).toBe('開拓地は、道の先にしか建てられません。《次に開拓地を置きたい方へ、道を伸ばします★》');
     });
 
+    it('リアルタイムモードの初期配置：誰でも今置くものを勧め、置き終わったら待っている人数を出す', () => {
+        const game = new Game(humans(3), { seed: 2, mode: 'realtime' });
+        const seat = (game.currentPlayerIndex + 1) % 3;
+        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。《7に近い数字（大きく描いた数字）の近くに置くと、よく集まります★》');
+        for (let i = 0; i < 4; i++) game.applyCommand(seat, createGameView(game, seat).options.suggestion.command);
+        expect(game.setupStepOf(seat)).toBeNull();
+        expect(story(game, seat)).toBe('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。ほかの人が置き終わるのを待っています（あと2人）。');
+    });
+
     it('都市を目指す理由・足りない資源（足りない材料は薄く）・今することがつながる', () => {
         const game = playing(5);
         const seat = game.currentPlayerIndex;

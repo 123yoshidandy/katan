@@ -36,6 +36,10 @@ export function coachStory(view, mode = null) {
     if (view.phase === 'setup') {
         const step = view.isMyTurn ? view.setup.step : null;
         if (step === 'road') return [say('開拓地は、道の先にしか建てられません。'), act('次に開拓地を置きたい方へ、道を伸ばします')];
+        // リアルタイムモードで、自分は置き終わった
+        if (view.realtimeSetup && !view.setup.step) {
+            return [say('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。'), say(`ほかの人が置き終わるのを待っています（あと${view.setup.placing.length}人）。`)];
+        }
         return [
             say('資源は、サイコロで出た数字のタイルに接する開拓地に入ります。'),
             step === 'settlement' ? act('7に近い数字（大きく描いた数字）の近くに置くと、よく集まります') : say('7に近い数字の近くが狙い目です。')

@@ -15,7 +15,8 @@
  * - 最長交易路（5本以上つながった道）と最大騎士力（騎士3枚以上）はそれぞれ2点
  * - 自分の手番に10点に達したら勝ち
  *
- * リアルタイムモード（mode: 'realtime'）：待ち時間を減らすため、初期配置のあとは全員が同時に動く
+ * リアルタイムモード（mode: 'realtime'）：待ち時間を減らすため、全員が同時に動く
+ * - 初期配置も順番を待たずに、各自が開拓地と道を2回ずつ置く（同じ場所は早い者勝ち。2つ目の開拓地の周りの資源をもらう）
  * - 巡のはじめに、全員が同時にサイコロを振る（自動）。どの人の目でも、全員が資源をもらう
  *   - 7 を出した人がいれば、その巡の生産のあとで、手札が8枚以上の人は半分を捨てる（何人が7を出しても1回）
  *   - 7 を出した人は、それぞれ盗賊を動かして1枚奪う
@@ -106,6 +107,10 @@ export default class Game {
         this.setupIndex = 0;
         this.setupStep = 'settlement'; // settlement / road
         this.lastSettlement = null;    // 初期配置で、道を伸ばす開拓地
+        // リアルタイムモードの初期配置は全員が同時に置くので、席ごとに持つ（次に置くもの・置いた開拓地の数・道を伸ばす開拓地）
+        this.setupSteps = this.players.map(() => 'settlement'); // settlement / road / null（置き終わった）
+        this.setupCounts = this.players.map(() => 0);
+        this.setupLasts = this.players.map(() => null);
 
         this.phase = 'setup';          // setup / play / end
         this.currentPlayerIndex = first;
@@ -135,7 +140,9 @@ export default class Game {
         this.eventSerial = 0;
         this.result = null;            // { winnerId, points }
         this.lastError = null;
-        this.log(`ゲーム開始。最初は${this.getCurrentPlayer().name}が開拓地を置きます`);
+        this.log(this.mode === 'realtime'
+            ? 'ゲーム開始。全員が同時に、開拓地と道を2回ずつ置きます（同じ場所は早い者勝ち）'
+            : `ゲーム開始。最初は${this.getCurrentPlayer().name}が開拓地を置きます`);
     }
 
     getCurrentPlayer() {
@@ -171,6 +178,11 @@ export default class Game {
             const accepted = this.applyTurnCommand(player, command);
             if (accepted) this.checkWinAll(player);
             return accepted;
+        }
+        // リアルタイムモードの初期配置も、順番を待たずに置く（同じ場所は先に届いた操作が通る）
+        if (this.isRealtimeSetup()) {
+            if (type !== 'build') return this.reject('初期配置の途中です');
+            return this.applyTurnCommand(player, command);
         }
 
         if (playerId !== this.currentPlayerIndex) return this.reject('あなたの番ではありません');
@@ -252,15 +264,29 @@ export default class Game {
     }
 
     buildSetup(player, piece, at) {
-        if (piece !== this.setupStep) return this.reject(this.setupStep === 'settlement' ? '開拓地を置いてください' : '道を置いてください');
+        const realtime = this.mode === 'realtime';
+        const step = this.setupStepOf(player.id);
+        if (!step) return this.reject('初期配置はもう済んでいます');
+        if (piece !== step) return this.reject(step === 'settlement' ? '開拓地を置いてください' : '道を置いてください');
         if (piece === 'settlement') {
-            if (!this.canPlaceSettlementAt(at)) return this.reject('そこには開拓地を置けません');
+            if (!this.canPlaceSettlementAt(at)) {
+                // リアルタイムモードでは、選んだ場所がほかの人に先に取られていることがある
+                const taken = realtime && isInt(at, 0, VERTEX_COUNT - 1);
+                return this.reject(taken ? 'そこはほかの人が先に取りました' : 'そこには開拓地を置けません');
+            }
+            // 2つ目の開拓地は、周りのタイルの資源をもらう
+            const second = realtime ? this.setupCounts[player.id] === 1 : this.setupIndex >= this.players.length;
             this.emit('build', { player: player.id, piece: 'settlement', at, cost: null });
             this.place(player, 'settlement', at);
-            this.lastSettlement = at;
-            this.setupStep = 'road';
-            // 2巡目の開拓地は、周りのタイルの資源をもらう
-            if (this.setupIndex >= this.players.length) {
+            if (realtime) {
+                this.setupCounts[player.id]++;
+                this.setupLasts[player.id] = at;
+                this.setupSteps[player.id] = 'road';
+            } else {
+                this.lastSettlement = at;
+                this.setupStep = 'road';
+            }
+            if (second) {
                 const gained = emptyCards();
                 const gains = [];
                 GEOMETRY.vertices[at].hexes.forEach(hexId => {
@@ -280,27 +306,50 @@ export default class Game {
         }
         if (!isInt(at, 0, EDGE_COUNT - 1) || this.roads[at] !== null) return this.reject('そこには道を置けません');
         const { a, b } = GEOMETRY.edges[at];
-        if (a !== this.lastSettlement && b !== this.lastSettlement) return this.reject('置いたばかりの開拓地につなげて道を置いてください');
+        const last = this.setupLastOf(player.id);
+        if (a !== last && b !== last) return this.reject('置いたばかりの開拓地につなげて道を置いてください');
         this.emit('build', { player: player.id, piece: 'road', at, cost: null });
         this.place(player, 'road', at);
         this.log(`${player.name}が道を置きました`);
+        if (realtime) {
+            this.setupLasts[player.id] = null;
+            this.setupSteps[player.id] = this.setupCounts[player.id] < 2 ? 'settlement' : null;
+            if (this.setupSteps.every(s => s === null)) this.finishSetup();
+            return true;
+        }
         this.setupIndex++;
         this.setupStep = 'settlement';
         this.lastSettlement = null;
         if (this.setupIndex === this.setupOrder.length) {
-            this.phase = 'play';
-            this.currentPlayerIndex = this.setupOrder[0];
-            if (this.mode === 'realtime') {
-                this.log('初期配置が終わりました。全員が同時に動きます');
-                this.startRound();
-            } else {
-                this.turnNumber = 1;
-                this.log(`初期配置が終わりました。${this.getCurrentPlayer().name}の番です`);
-            }
+            this.finishSetup();
         } else {
             this.currentPlayerIndex = this.setupOrder[this.setupIndex];
         }
         return true;
+    }
+
+    finishSetup() {
+        this.phase = 'play';
+        this.currentPlayerIndex = this.setupOrder[0];
+        if (this.mode === 'realtime') {
+            this.log('初期配置が終わりました。全員が同時に動きます');
+            this.startRound();
+        } else {
+            this.turnNumber = 1;
+            this.log(`初期配置が終わりました。${this.getCurrentPlayer().name}の番です`);
+        }
+    }
+
+    // seat の人が初期配置で次に置くもの（settlement / road。今置くものがなければ null）
+    setupStepOf(seat) {
+        if (this.phase !== 'setup') return null;
+        if (this.mode === 'realtime') return this.setupSteps[seat] ?? null;
+        return seat === this.currentPlayerIndex ? this.setupStep : null;
+    }
+
+    // seat の人が初期配置で道を伸ばす開拓地
+    setupLastOf(seat) {
+        return this.mode === 'realtime' ? this.setupLasts[seat] ?? null : this.lastSettlement;
     }
 
     place(player, piece, at) {
@@ -348,15 +397,15 @@ export default class Game {
     // 置ける場所の一覧（画面の候補表示と CPU で使う）
     roadSpots(playerId) {
         if (this.phase === 'setup') {
-            if (this.setupStep !== 'road') return [];
-            return GEOMETRY.vertices[this.lastSettlement].edges.filter(e => this.roads[e] === null);
+            if (this.setupStepOf(playerId) !== 'road') return [];
+            return GEOMETRY.vertices[this.setupLastOf(playerId)].edges.filter(e => this.roads[e] === null);
         }
         return GEOMETRY.edges.map(e => e.id).filter(e => this.canBuildRoad(playerId, e));
     }
 
     settlementSpots(playerId) {
         const all = GEOMETRY.vertices.map(v => v.id);
-        if (this.phase === 'setup') return this.setupStep === 'settlement' ? all.filter(v => this.canPlaceSettlementAt(v)) : [];
+        if (this.phase === 'setup') return this.setupStepOf(playerId) === 'settlement' ? all.filter(v => this.canPlaceSettlementAt(v)) : [];
         return all.filter(v => this.canBuildSettlement(playerId, v));
     }
 
@@ -795,6 +844,7 @@ export default class Game {
     // 今、操作が必要な人（CPU の進行と、ローカル対戦で誰の画面を出すかに使う）
     actors() {
         if (this.phase === 'end') return [];
+        if (this.isRealtimeSetup()) return this.players.filter(p => this.setupSteps[p.id]).map(p => p.id);
         if (this.isRealtimePlay()) {
             // 完了していない人・先に片付ける処理がある人・交渉に答えていない人
             return this.players.filter(p => !this.done[p.id] || this.queues[p.id].length > 0
@@ -821,6 +871,10 @@ export default class Game {
 
     isRealtimePlay() {
         return this.mode === 'realtime' && this.phase === 'play';
+    }
+
+    isRealtimeSetup() {
+        return this.mode === 'realtime' && this.phase === 'setup';
     }
 
     // seat の人が先に片付ける処理（なければ null）。手札を捨てるときは、通常モードと同じ形 { type: 'discard', remaining: { 席: 枚数 } }

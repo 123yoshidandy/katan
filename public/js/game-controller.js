@@ -7,7 +7,7 @@
 import Game, { RESOURCES } from './game.js';
 import { GEOMETRY } from './board.js';
 import { createGameView, hydrateGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, cpuActor } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, cpuActor, setupCpuSeats, setupCpuDelay } from './cpu-player.js';
 
 const CPU_STEP_DELAY_MS = 700; // CPUの手は1手ずつ間を置いて見せる
 const REALTIME_CPU_STEP_DELAY_MS = 350; // リアルタイムモードでは、CPU が並んで動くので間を短くする
@@ -19,6 +19,7 @@ export default class LocalGameController {
         this.listeners = listeners;
         this.game = new Game(players, { mode });
         this.cpuTimer = null;
+        this.setupDueAt = {};   // リアルタイムモードの初期配置で、CPU ごとに次に置く時刻
         this.lastHumanId = null;
         this.scheduleCpu();
     }
@@ -56,6 +57,10 @@ export default class LocalGameController {
 
     scheduleCpu() {
         clearTimeout(this.cpuTimer);
+        if (this.game.isRealtimeSetup()) {
+            this.scheduleSetupCpu();
+            return;
+        }
         if (!isCpuTurn(this.game)) return;
         this.cpuTimer = setTimeout(() => {
             // どこで例外が出ても、必ず次の手を予約する（対戦が止まらないように）
@@ -71,6 +76,34 @@ export default class LocalGameController {
                 }
             }
         }, this.game.isRealtimePlay() ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS);
+    }
+
+    // リアルタイムモードの初期配置：CPU ごとに、人間が場所を選ぶくらいの間を置いて1つずつ置く（早い者勝ちなので）
+    scheduleSetupCpu() {
+        const seats = setupCpuSeats(this.game);
+        if (seats.length === 0) return;
+        const now = Date.now();
+        seats.forEach(seat => { this.setupDueAt[seat] ??= now + setupCpuDelay(this.game, seat); });
+        const next = Math.min(...seats.map(seat => this.setupDueAt[seat]));
+        this.cpuTimer = setTimeout(() => {
+            const time = Date.now();
+            try {
+                seats.filter(seat => this.setupDueAt[seat] <= time && this.game.isRealtimeSetup()).forEach(seat => {
+                    try {
+                        runCpuStep(this.game, seat);
+                    } catch (error) {
+                        console.error(error);
+                    }
+                    this.setupDueAt[seat] = time + setupCpuDelay(this.game, seat);
+                });
+            } finally {
+                try {
+                    this.listeners.onUpdate?.();
+                } finally {
+                    this.scheduleCpu();
+                }
+            }
+        }, Math.max(0, next - now));
     }
 
     stepCpu() {

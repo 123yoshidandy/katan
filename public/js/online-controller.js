@@ -11,6 +11,9 @@ import { hydrateGameView } from './game-view.js';
 const STORAGE_KEY = 'katan.online'; // 再接続に使う部屋コードとトークン
 const CPU_STEP_DELAY_MS = 700;              // CPUの手はローカル対戦と同じ間隔で順に見せる
 const REALTIME_CPU_STEP_DELAY_MS = 350;     // リアルタイムモードでは、CPU が並んで動くので間を短くする
+// リアルタイムモードの初期配置で CPU が置いている間、サーバーに時刻を確かめさせる間隔
+// （サーバーはタイマーを持てないので、届いたメッセージのたびに、置く時刻が来た CPU に置かせる）
+const SETUP_PING_INTERVAL_MS = 1000;
 
 // 保存した参加情報（部屋コード・トークン・席・名前）
 export function loadOnlineSession() {
@@ -27,17 +30,22 @@ export default class OnlineGameController {
         this.listeners = listeners;
         this.view = null;              // 表示中のビュー（hydrate 済み）
         this.awaitingResponse = false; // 操作を送ってから返事が届くまで
+        this.setupPingTimer = null;
         this.net = new NetplayClient({ serverUrl, storageKey: STORAGE_KEY, cpuStepDelayMs: CPU_STEP_DELAY_MS });
 
         this.net.on('lobby', (lobby) => {
             // ロビーに戻ったら、前のゲームの表示を消す
-            if (lobby.status === 'lobby') this.view = null;
+            if (lobby.status === 'lobby') {
+                this.view = null;
+                this.updateSetupPing();
+            }
             this.net.cpuStepDelayMs = lobby.settings?.mode === 'realtime' ? REALTIME_CPU_STEP_DELAY_MS : CPU_STEP_DELAY_MS;
             listeners.onLobby?.(lobby);
         });
         this.net.on('state', ({ view }) => {
             this.awaitingResponse = false;
             this.view = hydrateGameView(view);
+            this.updateSetupPing();
             listeners.onUpdate?.();
         });
         this.net.on('error', ({ message }) => {
@@ -71,6 +79,19 @@ export default class OnlineGameController {
     leave() {
         this.net.leave();
         this.view = null;
+        this.updateSetupPing();
+    }
+
+    // リアルタイムモードの初期配置で、CPU（代行を含む）がまだ置いている間だけ ping を送り続ける
+    updateSetupPing() {
+        const view = this.view;
+        const waiting = Boolean(view?.realtimeSetup && view.setup.placing.some(seat => view.players[seat].isCPU || view.players[seat].proxy));
+        if (waiting && !this.setupPingTimer) {
+            this.setupPingTimer = setInterval(() => this.net.ping(), SETUP_PING_INTERVAL_MS);
+        } else if (!waiting && this.setupPingTimer) {
+            clearInterval(this.setupPingTimer);
+            this.setupPingTimer = null;
+        }
     }
 
     // ===== 画面とのやり取り（ローカル対戦のコントローラーと同じ形） =====

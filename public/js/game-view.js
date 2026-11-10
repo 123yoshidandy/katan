@@ -23,6 +23,16 @@ export function publicEvent(event, viewerId) {
     return copy;
 }
 
+function setupView(game, viewerId) {
+    const seat = game.mode === 'realtime' ? viewerId : game.currentPlayerIndex;
+    const has = seat !== null && seat !== undefined;
+    return {
+        step: has ? game.setupStepOf(seat) : null,
+        lastSettlement: has ? game.setupLastOf(seat) : null,
+        placing: game.actors()
+    };
+}
+
 // viewerId のプレイヤーから見たゲームの状態（観戦や全員CPUのときは viewerId = null）
 export function createGameView(game, viewerId) {
     const isViewer = (id) => id === viewerId;
@@ -38,7 +48,8 @@ export function createGameView(game, viewerId) {
         roads: [...game.roads],
         bank: { ...game.bank },
         devDeckCount: game.devDeck.length,
-        setup: game.phase === 'setup' ? { step: game.setupStep, lastSettlement: game.lastSettlement, round: game.setupIndex < game.players.length ? 1 : 2 } : null,
+        // 初期配置：見ている人が次に置くもの（リアルタイムモードでは席ごと。通常は手番の人）と、まだ置いている人
+        setup: game.phase === 'setup' ? setupView(game, viewerId) : null,
         rolled: game.rolled,
         dice: game.dice ? [...game.dice] : null,
         devPlayed: game.devPlayed,
@@ -106,12 +117,18 @@ export function hydrateGameView(view) {
     const tradeWaiting = Boolean(me && view.trade && view.trade.from !== me.id && !view.trade.responses[me.id]);
     // リアルタイムモードの初期配置のあとは、いつでも自分の番（完了したあとも、次の巡を待つ間は動ける）
     const realtime = view.mode === 'realtime' && view.phase === 'play';
+    // リアルタイムモードの初期配置は、置き終わるまで自分の番
+    const realtimeSetup = view.mode === 'realtime' && view.phase === 'setup';
+    let isMyTurn = Boolean(me) && me === current && playing;
+    if (realtime) isMyTurn = Boolean(me);
+    if (realtimeSetup) isMyTurn = Boolean(me && view.setup?.step);
     return {
         ...view,
         me,
         current,
         realtime,
-        isMyTurn: realtime ? Boolean(me) : Boolean(me) && me === current && playing,
+        realtimeSetup,
+        isMyTurn,
         discardCount,
         tradeWaiting
     };

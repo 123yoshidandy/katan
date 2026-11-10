@@ -30,7 +30,7 @@ const humanAnswering = (game) => game.players.some(p => !isControlledByCpu(p) &&
 export function cpuActor(game) {
     // リアルタイムモードでは、CPU が交互に動くよう、記録の長さで順番をずらす
     const actors = game.actors();
-    const shift = game.isRealtimePlay() && actors.length ? game.commands.length % actors.length : 0;
+    const shift = (game.isRealtimePlay() || game.isRealtimeSetup()) && actors.length ? game.commands.length % actors.length : 0;
     const actor = [...actors.slice(shift), ...actors.slice(0, shift)].find(id => {
         const player = game.players[id];
         // 交渉中の手番の人は、相手の返事を待つ（自分から交渉する CPU はいない）
@@ -81,9 +81,27 @@ function casualMind(game, seat) {
 // 実際に打つ CPU の手（見落としあり）
 export const chooseCpuCommand = (game, seat) => chooseCommand(game, seat, casualMind(game, seat));
 
-// CPU を1手進める。進めたら true
-export function runCpuStep(game) {
-    const seat = cpuActor(game);
+// ===== リアルタイムモードの初期配置 =====
+// 早い者勝ちなので、CPU がすぐ置くと良い場所を先に取ってしまう。人間が場所を選ぶくらいの間を置いて、1つずつ置く
+// 間はローカル対戦のコントローラーとサーバーが測る（ゲームは時刻を使わない）
+
+export const SETUP_CPU_DELAY_MS = { settlement: 4000, settlementSpread: 3000, road: 1500 }; // 開拓地は 4〜7秒、道は 1.5秒
+
+// 初期配置を置く CPU の席（リアルタイムモードの初期配置のときだけ）
+export function setupCpuSeats(game) {
+    if (!game.isRealtimeSetup()) return [];
+    return game.actors().filter(id => isControlledByCpu(game.players[id]));
+}
+
+// seat の CPU が次の1つを置くまでの間（ms）。開拓地の間は、シード・席・置いた数から決める
+export function setupCpuDelay(game, seat) {
+    if (game.setupStepOf(seat) === 'road') return SETUP_CPU_DELAY_MS.road;
+    const spread = hash01(game.seed, seat, game.setupCounts[seat], 6) * SETUP_CPU_DELAY_MS.settlementSpread;
+    return SETUP_CPU_DELAY_MS.settlement + Math.round(spread);
+}
+
+// CPU を1手進める（seat を省くと、操作が必要な CPU から選ぶ）。進めたら true
+export function runCpuStep(game, seat = cpuActor(game)) {
     if (seat === null) return false;
     const command = chooseCpuCommand(game, seat);
     if (game.applyCommand(seat, command)) return true;
@@ -167,14 +185,16 @@ const best = (items, score) => items.reduce((top, item) => {
 
 function chooseSetup(game, seat, mind) {
     const player = game.players[seat];
-    if (game.setupStep === 'settlement') {
+    const step = game.setupStepOf(seat);
+    const last = game.setupLastOf(seat);
+    if (step === 'settlement') {
         return { type: 'build', piece: 'settlement', at: best(game.settlementSpots(seat), v => vertexValue(game, v, player, mind)) };
     }
     // 道は、その先に開拓地を置ける良い頂点がある向きへ
     const edges = game.roadSpots(seat);
     const at = best(edges, e => {
-        const end = otherEnd(e, game.lastSettlement);
-        const nexts = GEOMETRY.vertices[end].neighbors.filter(v => v !== game.lastSettlement && game.canPlaceSettlementAt(v));
+        const end = otherEnd(e, last);
+        const nexts = GEOMETRY.vertices[end].neighbors.filter(v => v !== last && game.canPlaceSettlementAt(v));
         return Math.max(0, ...nexts.map(v => vertexValue(game, v, player, mind)));
     });
     return { type: 'build', piece: 'road', at };

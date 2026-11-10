@@ -5,12 +5,12 @@ import game from '../server/src/game-definition.js';
 // 手番の人の接続
 const currentOf = (clients) => clients[clients[0].last('state').view.currentPlayerId];
 
-// 初期配置を、各自の候補の先頭に置いて済ませる
+// 初期配置を、各自の候補の先頭に置いて済ませる（リアルタイムモードでは、置くものが残っている人から）
 async function finishSetup(clients) {
     for (let i = 0; i < clients.length * 4; i++) {
         const view = clients[0].last('state').view;
         if (view.phase !== 'setup') break;
-        const current = currentOf(clients);
+        const current = view.mode === 'realtime' ? clients.find(c => c.last('state').view.setup.step) : currentOf(clients);
         const { options, setup } = current.last('state').view;
         const piece = setup.step;
         const at = piece === 'settlement' ? options.settlementSpots[0] : options.roadSpots[0];
@@ -166,6 +166,42 @@ describe('オンライン対戦（ゲームの定義）', () => {
         const view = other.last('state').view;
         expect(view.players[clients.indexOf(current)].proxy).toBe(true);
         expect(view.currentPlayerId).toBe(clients.indexOf(other));
+    });
+
+    it('リアルタイムモードの初期配置では、CPU は間を置いて1つずつ置く（届いたメッセージのたびに時刻を確かめる）', async () => {
+        const server = createTestServer(game);
+        const [a] = await server.createRoom(['あき']);
+        await a.send('setSettings', { settings: { mode: 'realtime' } });
+        await a.send('addCpu');
+        await a.send('addCpu');
+        await a.send('start');
+        const view = () => a.last('state').view;
+        const placedBy = (seat) => view().buildings.filter(b => b?.owner === seat).length + view().roads.filter(o => o === seat).length;
+        const ping = () => a.send('ping', { clientTime: 0 });
+        // 始めてすぐは、CPU は置かない。人間は順番を待たずに置ける
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        await a.send('command', { command: { type: 'build', piece: 'settlement', at: view().options.settlementSpots[0] } });
+        expect(placedBy(0)).toBe(1);
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        server.clock.now += 3900;
+        await ping();
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        // 開拓地は 4〜7秒で置く。置いたら、次の道まで間を置く
+        server.clock.now += 3200;
+        await ping();
+        expect([placedBy(1), placedBy(2)]).toEqual([1, 1]);
+        await ping();
+        expect([placedBy(1), placedBy(2)]).toEqual([1, 1]);
+        // 時刻が進めば CPU は置き終わる。人間が置き終わるまでは初期配置のまま
+        for (let i = 0; i < 40; i++) {
+            server.clock.now += 1000;
+            await ping();
+        }
+        expect([placedBy(1), placedBy(2)]).toEqual([4, 4]);
+        expect(view().phase).toBe('setup');
+        expect(view().setup.placing).toEqual([0]);
+        await finishSetup([a]);
+        expect(view().phase).toBe('play');
     });
 
     it('対戦後は、ホストが同じ顔ぶれで再戦できる', async () => {
